@@ -28,6 +28,11 @@ which closes the ownership gap identified against Master Contract §0.3/§4.3.
 - Gate 0 does not close until the machine-readable directories above are
   populated and every consumer's CI validates against a tagged release.
 
+## Work plan
+
+The Gate 0 work plan lives in [tasks/](tasks/README.md) — twelve tasks ending
+in the `v0.1.0` tag that unblocks Phase 0 in every consumer repository.
+
 ## Consumers
 
 `karyalay-mail` · `karyalay-webmail` · `karyalay-mail-infra` · `karyalay-mail-ops`
