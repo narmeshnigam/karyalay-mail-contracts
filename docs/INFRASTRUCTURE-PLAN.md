@@ -36,7 +36,7 @@ provider until Phase B, and migrates only once the platform is proven.
 | --- | --- | --- | --- |
 | `mx1.karyalay.site` | Hetzner IP | SMTP (25/465/587), IMAP, PTR target | **DNS-only (grey)** |
 | `mail.karyalay.site` | Cloudflare Pages project A | Webmail UI | Proxied (orange) |
-| `api.karyalay.site` | Hostinger vps_server_1 | Repo 1 control-plane API | Proxied (orange) — **open decision, see below** |
+| `api.karyalay.site` | Hostinger vps_server_1 | Repo 1 control-plane API | **DNS-only (grey)** — ADR-INF-035 |
 | `content.karyalay.site` | Cloudflare Pages project B | Sandboxed message rendering | Proxied (orange) |
 | `mta-sts.karyalay.site` | `mta-sts-policy` service (Repo 3 T05.03) | MTA-STS policy host | Proxied (orange) |
 
@@ -64,31 +64,44 @@ at `https://mta-sts.<domain>/.well-known/mta-sts.txt` with a generated tenant
 mapping — request-time multi-tenant behaviour that Pages cannot express, and
 that breaks at the second customer domain. Repo 3 T05.03 builds it.
 
-### Open decision — should `api.karyalay.site` stay proxied?
+### Third-party TLS termination — decided 2026-08-18 (ADR-INF-035)
 
-Orange cloud means **Cloudflare terminates TLS on control-plane traffic** and
-sees message bodies, attachment metadata and session tokens in cleartext at the
-edge. That is materially unlike serving a JavaScript bundle.
+`api.karyalay.site` was planned as proxied. That was never a decision, it was
+inherited from "everything goes behind Cloudflare" — reasonable for a website,
+consequential for a mail platform, because a proxied hostname means **Cloudflare
+terminates TLS** and reads message bodies, attachment metadata and session
+tokens at the edge.
 
-**No existing rule decides this.** INF-GOV-002 and ADR-INF-002 forbid
-*substituting* a vendor for a required production component — a commercial SMTP
-relay, white-label mailbox platform, hosted spam gateway, hosted IMAP store or
-vendor control plane. A CDN in front of a control plane you still own and run
-substitutes for nothing, so neither rule reaches it. This is an open trade
-between confidentiality and availability, and it has no precedent to inherit.
+**The rule now in force:** no Karyalay hostname may terminate TLS at a third
+party while carrying message content, credentials or session tokens **in a form
+that third party can read.** It is a rule rather than a hostname choice so that
+future endpoints are decided by it instead of by whoever provisions them.
 
-**The current plan is incoherent either way, and that is the actual defect.**
-Proxying while leaving `vps_server_1` reachable on its own IP gives the
-confidentiality cost with none of the protection — anyone who finds the origin
-address bypasses the edge entirely. Going proxied *properly* means the
-control-plane firewall admits 443 only from Cloudflare's published ranges, plus
-Authenticated Origin Pull so the origin rejects anything that did not come
-through the edge. That work belongs to T01.03 and T03.07 and is not currently
-in either. Whichever way this resolves, one of two things has to be built.
+That permits the static origins (no content), the MTA-STS policy host (a public
+document) and R2 (backups are encrypted client-side per spec §1617, so
+Cloudflare receives ciphertext only). It forbids proxying the API. Repo 4's ops
+console falls under it when it gets a hostname.
 
-Resolve before Phase B. Record the outcome as a deviation if the answer is to
-keep the proxy, and get a processor agreement in place before any customer
-message content flows through it.
+Two things made this decidable now rather than later. **No customer data exists
+yet**, so a clean boundary is free today and never cheaper — and unlike most of
+this plan, a year of customer mail through an edge is not undone by changing your
+mind. And the protection forfeited is partial anyway: `mx1` must stay DNS-only
+forever because Cloudflare cannot proxy SMTP, so the platform already runs a
+permanently exposed public address.
+
+**The honest cost:** no volumetric DDoS absorption for the control plane. Stated
+here rather than discovered in an incident, and no customer-facing document may
+claim otherwise. The origin becomes the edge, so T01.03 gains host-layer
+connection-rate limiting and T03.07 gains the ACME certificate and applies those
+limits. Neither existed before — the old plan had *neither* Cloudflare lockdown
+*nor* origin hardening, which is the state ADR-INF-035 actually removes.
+
+**Reversal is cheap but must be done properly.** Flipping the proxy on is not
+sufficient; that reproduces the incoherent state where Cloudflare sees content
+and an attacker reaching the origin address bypasses the edge anyway. Any move to
+proxied requires all three: 443 admitted only from Cloudflare's published ranges,
+Authenticated Origin Pull, and a signed processor agreement before customer
+content flows. Amend the ADR to do it.
 
 ### DNS record set for `karyalay.site`
 

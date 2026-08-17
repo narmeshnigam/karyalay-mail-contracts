@@ -631,12 +631,13 @@ T00.08, and **ADR-INF-034** ACCEPTED (Repo 3 owns the public zone and the
 application origins; Pages, static only, no Functions). Nothing in the wave model
 is waiting on a decision any more.
 
-One decision remains open but blocks nothing in Wave 0: whether
-`api.karyalay.site` should stay Cloudflare-proxied, given that an orange cloud
-means Cloudflare terminates TLS on control-plane traffic and sees message content
-in cleartext. ADR-INF-034 deliberately left it out — it is a different question
-from static asset hosting and deserves its own rationale. INFRASTRUCTURE-PLAN §1
-records it; settle it before Phase B.
+**ADR-INF-035** closed the last open question the same day: no Karyalay hostname
+terminates TLS at a third party while carrying message content, credentials or
+session tokens in readable form. `api.karyalay.site` becomes DNS-only; the static
+origins and the encrypted R2 backups are unaffected. The cost is stated rather
+than hidden — the control plane has no volumetric DDoS absorption, and the origin
+hardening that replaces it lands in T01.03 and T03.07, neither of which had it
+before.
 
 Everything else in the programme is waiting on track 1.
 
