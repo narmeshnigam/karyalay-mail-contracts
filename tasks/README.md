@@ -34,7 +34,7 @@ folder the first work item of the entire programme.
 
 | Folder | Title | Objective | Exit criteria | Status |
 | --- | --- | --- | --- | --- |
-| [phase-00-gate-0-contract-population/](phase-00-gate-0-contract-population/README.md) | Gate 0 — contract population | Populate all six contract directories, stand up validation, tag `v0.1.0` | ADR-KEM-001 closure conditions; Master Contract §0.3 | ☐ todo |
+| [phase-00-gate-0-contract-population/](phase-00-gate-0-contract-population/README.md) | Gate 0 — contract population | Populate all six contract directories, stand up validation, tag `v0.1.0` | ADR-KEM-001 closure conditions; Master Contract §0.3 | ◐ in-progress (2/12 done: both ADR decisions) |
 
 ## Sources of truth
 

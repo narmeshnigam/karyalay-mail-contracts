@@ -2,10 +2,20 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **PROPOSED** — requires architecture owner decision |
-| Date | 2026-08-16 |
+| Status | **ACCEPTED** |
+| Date | 2026-08-16 (proposed) · 2026-08-17 (accepted) |
 | Amends | Repo 3 ADR-INF-004, ADR-INF-006, §57, §61; Master §33.4, §34.3 |
-| Approvers | Pending: architecture owner, SRE/operations owner |
+| Approvers | Architecture owner (Narmesh Nigam), 2026-08-17 |
+
+## Decision record
+
+Accepted by the architecture owner on 2026-08-17. The honesty rule is now
+binding: no deployment claims HA without proven fencing capability
+(Appendix AG drill evidence); deployments without fencing run single-node
+and publish measured RPO/RTO instead. The named exit triggers govern when
+the DRBD/CE stage is replaced by a successor architecture. The first
+deployment's fencing capability remains to be established against the
+actual hosting environment (tracked in Repo 3 tasks T07.04/T07.08).
 
 ## Context and problem
 

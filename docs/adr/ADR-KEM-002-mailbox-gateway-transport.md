@@ -2,10 +2,19 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **PROPOSED** — requires architecture owner decision |
-| Date | 2026-08-16 |
+| Status | **ACCEPTED** |
+| Date | 2026-08-16 (proposed) · 2026-08-17 (accepted) |
 | Amends | Repo 1 §19.1, §19.2; Repo 3 §29; Repo 2 Appendix N delta D-02 |
-| Approvers | Pending: architecture owner, security owner |
+| Approvers | Architecture owner (Narmesh Nigam), 2026-08-17 |
+
+## Decision record
+
+Accepted by the architecture owner on 2026-08-17. Per-mailbox data operations
+use pooled IMAP with master-user impersonation; Doveadm HTTP is retained for
+administrative operations only. Consequences activated: Repo 1 Phase 5
+(mailbox gateway) is unblocked on this decision; Repo 2 delta D-02 becomes
+implementable via IMAP IDLE once its canonical endpoint ships in this
+repository.
 
 ## Context and problem
 

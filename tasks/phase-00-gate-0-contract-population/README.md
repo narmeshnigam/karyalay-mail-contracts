@@ -1,7 +1,7 @@
 ---
 phase: 00
-status: todo
-last-updated: 2026-08-16
+status: in-progress
+last-updated: 2026-08-17
 ---
 
 # Phase 00 — Gate 0: contract population
@@ -41,8 +41,8 @@ and Master Contract §0.3:
 | [T00.07](T00.07-observability-contract.md) | Observability contract (`observability/`) | ☐ todo | — | Master; Repo 1 App. H; Repo 2 App. K |
 | [T00.08](T00.08-dns-contract.md) | DNS record contract (`dns/`) | ☐ todo | — | Repo 1 §10–§11; Repo 3 DNS §§ |
 | [T00.09](T00.09-validation-harness.md) | Validation harness + consumer pinning guide | ⛔ blocked | T00.01–T00.08 | Master §0.3; ADR-KEM-001 |
-| [T00.10](T00.10-decide-adr-kem-002.md) | Decide ADR-KEM-002 (gateway transport) | ☐ todo | — (owner decision) | Repo 1 §19 |
-| [T00.11](T00.11-decide-adr-kem-003.md) | Decide ADR-KEM-003 (storage HA ceiling) | ☐ todo | — (owner decision) | Repo 3 §56–§57, App. AG |
+| [T00.10](T00.10-decide-adr-kem-002.md) | Decide ADR-KEM-002 (gateway transport) | ☑ done | — | Repo 1 §19 |
+| [T00.11](T00.11-decide-adr-kem-003.md) | Decide ADR-KEM-003 (storage HA ceiling) | ☑ done | — | Repo 3 §56–§57, App. AG |
 | [T00.12](T00.12-tag-v0.1.0-gate-0-closure.md) | Tag `v0.1.0` + Gate 0 closure evidence | ⛔ blocked | T00.01–T00.09 | ADR-KEM-001 |
 
 ## Phase-gate evidence checklist
@@ -50,4 +50,5 @@ and Master Contract §0.3:
 - ☐ Validation harness output (all artifacts pass) archived
 - ☐ `v0.1.0` tag exists and is annotated with the artifact inventory
 - ☐ Four consumer CI validation runs recorded (one per repo)
-- ☐ Decision register updated for ADR-KEM-002 and ADR-KEM-003 outcomes
+- ☑ Decision register updated for ADR-KEM-002 and ADR-KEM-003 outcomes
+  (both ACCEPTED 2026-08-17)
