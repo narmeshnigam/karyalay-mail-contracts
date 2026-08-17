@@ -68,15 +68,27 @@ that breaks at the second customer domain. Repo 3 T05.03 builds it.
 
 Orange cloud means **Cloudflare terminates TLS on control-plane traffic** and
 sees message bodies, attachment metadata and session tokens in cleartext at the
-edge. That is materially unlike serving a JavaScript bundle, and it sits far
-closer to ADR-INF-002's line on third-party components in the production mail
-path.
+edge. That is materially unlike serving a JavaScript bundle.
 
-It may still be right — a single Hostinger VPS genuinely wants DDoS protection
-and origin-IP concealment, and grey-clouding forfeits both. But this should be a
-decision with a written rationale, not a default inherited from "everything goes
-behind Cloudflare." ADR-INF-034 deliberately does **not** settle it. Resolve
-before Phase B, and record it as a deviation if the answer is to keep the proxy.
+**No existing rule decides this.** INF-GOV-002 and ADR-INF-002 forbid
+*substituting* a vendor for a required production component — a commercial SMTP
+relay, white-label mailbox platform, hosted spam gateway, hosted IMAP store or
+vendor control plane. A CDN in front of a control plane you still own and run
+substitutes for nothing, so neither rule reaches it. This is an open trade
+between confidentiality and availability, and it has no precedent to inherit.
+
+**The current plan is incoherent either way, and that is the actual defect.**
+Proxying while leaving `vps_server_1` reachable on its own IP gives the
+confidentiality cost with none of the protection — anyone who finds the origin
+address bypasses the edge entirely. Going proxied *properly* means the
+control-plane firewall admits 443 only from Cloudflare's published ranges, plus
+Authenticated Origin Pull so the origin rejects anything that did not come
+through the edge. That work belongs to T01.03 and T03.07 and is not currently
+in either. Whichever way this resolves, one of two things has to be built.
+
+Resolve before Phase B. Record the outcome as a deviation if the answer is to
+keep the proxy, and get a processor agreement in place before any customer
+message content flows through it.
 
 ### DNS record set for `karyalay.site`
 
