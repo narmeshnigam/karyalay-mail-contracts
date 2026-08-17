@@ -77,7 +77,7 @@ of local effort can clear.
    │  infra      │ │  mail       │ │  webmail    │ │  ops        │        │
    │             │ │             │ │             │ │             │        │
    │ PARTLY FREE │ │  fully ⛔   │ │  fully ⛔   │ │  fully ⛔   │        │
-   │ 6 tasks ☐   │ │  (8 of 9)   │ │  (8 of 10)  │ │  (9 of 11)  │        │
+   │ 8 tasks ☐   │ │  (8 of 9)   │ │  (8 of 10)  │ │  (9 of 11)  │        │
    │ + TWD.01–05 │ │             │ │             │ │ + AI-04..09 │◄───────┘
    └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘   freeze
                                                                   (contracts T00.06)
@@ -87,9 +87,11 @@ That asymmetry is the entire answer to "where do I start." **Repo 3 is the only
 repository with a door open today**, and contracts is the only thing that opens
 the other three.
 
-Repo 3's open door is wider than it first appears: Phase 0's T00.03/T00.04/T00.05
-*and* Phase 1's T01.01/T01.02/T01.03 all carry `blocked-by: —`. Phase 1 needs a
-skeleton and a CI gate, not a contract. See §4 Wave 0 Track B.
+Repo 3's open door is wider than it first appears: Phase 0's
+T00.03/T00.04/T00.05/T00.08 *and* Phase 1's T01.01/T01.02/T01.03/T01.07 all
+carry `blocked-by: —`. Phase 1 needs a skeleton and a CI gate, not a contract.
+Phase 1's remaining three tasks are unblocked too, so the real constraint is
+attention, not dependencies. See §4 Wave 0 Track B.
 
 ---
 
@@ -149,6 +151,7 @@ four parallel build tracks.
 | **T01.02 ☐** | **Debian 13 baseline, identities, time — `bootstrap.yml`** | Mounts the 25 GB volume as the Dovecot mail root, XFS |
 | **T01.03 ☐** | **nftables firewall-as-code — HARD GATE** | See below |
 | **T00.08 ☐** | **Determine the OIDC identity provider disposition** | A question to a person, not engineering work — see below |
+| **T01.07 ☐** | **Public zone records and the two application origins** | ADR-INF-034 — webmail Phase 0 builds against these; see below |
 | T00.01 ⛔ | Pin contracts release, vendor schemas | Waits on tag |
 | T00.02 ⛔ | Synthetic Repo 1 fixtures + API simulator | Waits on tag + T00.01 |
 
@@ -179,12 +182,21 @@ drill, availability alerting — or a monitoring hookup. It costs nothing to ask
 and it is the difference between estimating Wave 3 and guessing at it.
 ADR-INF-033's `idp` role stays conditional until it reports.
 
-Also in Wave 0, from [INFRASTRUCTURE-PLAN §1](INFRASTRUCTURE-PLAN.md): provision
-the **Cloudflare Pages projects and DNS for `mail.karyalay.site` and
-`content.karyalay.site`**. The two-origin split is listed in §7 there as
-retrofit-impossible, and webmail Phase 0 (T00.06, T00.08) now builds against it
-from the first commit — so the origins must exist before that phase starts, not
-at Phase 6 where the only reference used to live.
+**T01.07 provisions the application origins**, and until 2026-08-18 nothing did.
+`mail.karyalay.site` and `content.karyalay.site` were Wave 0 work in
+[INFRASTRUCTURE-PLAN §4 step 8a](INFRASTRUCTURE-PLAN.md) and in no task tree —
+planned in prose, owned by nobody, which is the defect class ADR-INF-033 was
+raised on. ADR-INF-034 now assigns them to Repo 3 on the same boundary: Repo 3
+provisions the origin, Repo 2 deploys onto it.
+
+The split is listed in INFRASTRUCTURE-PLAN §7 as retrofit-impossible and webmail
+Phase 0 (T00.06, T00.08) builds against it from the first commit, so the origins
+must exist before that phase opens — not at Phase 6 where the only reference
+used to live. Two constraints carry into the task: **two separate Pages
+projects** (one project with two custom domains serves both names with identical
+headers from a single deployment and makes the split cosmetic), and **no Pages
+Functions** without an ADR, which is what keeps leaving Cloudflare a CNAME change
+rather than a rewrite.
 
 **Plus the standing deliverability workstream**, whose README states
 *"UNBLOCKED. Start today"* and calls it **the longest-lead-time item in the
@@ -282,16 +294,17 @@ Wave 4, which hid real parallelism: Wave 4 makes them *provable*, it is not what
 makes them buildable. Repo 2's §59 gate still applies — a phase is never
 complete "solely because screens render" — so expect to close them in Wave 4.
 
-**Repo 3 Phase 1 is the pacing item for the whole wave.** Its six tasks:
+**Repo 3 Phase 1 is the pacing item for the whole wave.** Its seven tasks:
 
 | Task | Deliverable |
 | --- | --- |
 | T01.01 | Inventory schema and environment model (§6, §53) |
 | T01.02 | Debian 13 baseline, identities, time — `bootstrap.yml` (§9–§11) — **this is where the 25 GB volume gets mounted as the Dovecot mail root, XFS** |
 | T01.03 | **nftables firewall-as-code (§8, §12, App. C) — HARD GATE** |
-| T01.04 | NSD authoritative + Unbound recursive — `dns.yml` (§43–§44, §75) |
+| T01.04 | NSD authoritative + Unbound recursive — `dns.yml` (§43–§44, §75) — mail-plane split DNS, *not* the public Cloudflare zone |
 | T01.05 | Observability plumbing (§66–§68) |
 | T01.06 | Early runbook drafts RB-029/030/039/042 (§80, App. Y) |
+| T01.07 | Public zone records and the two application origins (ADR-INF-034) — starts in Wave 0 |
 
 **T01.03 must land before any datastore binds a port.** Redis, MariaDB and
 OpenBao all listen by default; a Debian box on a public IPv4 with an unfiltered
@@ -601,8 +614,8 @@ Two tracks, both startable today, neither blocking the other:
    own), then T00.09, then tag.
 2. **`karyalay-mail-infra`** — T00.03 skeleton, T00.04 CI, T00.05 test CA, then
    straight into **T01.01 → T01.02 → T01.03**. Plus **T00.08** (ask about the
-   IdP), DKIM key generation (TWD.02's open item, no blocker), and starting
-   TWD.03.
+   IdP), **T01.07** (the two application origins), DKIM key generation (TWD.02's
+   open item, no blocker), and starting TWD.03.
 
 **T01.03 is the one with a clock on it that is not the contracts tag.**
 `mx-sin-1` is live and unfirewalled beyond sshd; nothing else in Wave 0 is
@@ -612,9 +625,18 @@ holding an exposure open.
 One conversation decides whether Wave 3 contains a Keycloak build. Do it this
 week.
 
-Both ADRs are now decided — **ADR-OPS-022** ACCEPTED (split the clients, keep
-the gate) and **ADR-INF-033** ACCEPTED with the `idp` role conditional on
-T00.08. Nothing in the wave model is waiting on a decision any more.
+All three ADRs are now decided — **ADR-OPS-022** ACCEPTED (split the clients,
+keep the gate), **ADR-INF-033** ACCEPTED with the `idp` role conditional on
+T00.08, and **ADR-INF-034** ACCEPTED (Repo 3 owns the public zone and the
+application origins; Pages, static only, no Functions). Nothing in the wave model
+is waiting on a decision any more.
+
+One decision remains open but blocks nothing in Wave 0: whether
+`api.karyalay.site` should stay Cloudflare-proxied, given that an orange cloud
+means Cloudflare terminates TLS on control-plane traffic and sees message content
+in cleartext. ADR-INF-034 deliberately left it out — it is a different question
+from static asset hosting and deserves its own rationale. INFRASTRUCTURE-PLAN §1
+records it; settle it before Phase B.
 
 Everything else in the programme is waiting on track 1.
 
@@ -623,7 +645,7 @@ Everything else in the programme is waiting on track 1.
 ## 11. Audit record — 2026-08-18
 
 First full reconciliation of this document against all 38 phases and
-workstreams in the five task trees. Seven corrections landed.
+workstreams in the five task trees. Eight corrections landed.
 
 | # | Finding | Fix |
 | --- | --- | --- |
@@ -634,6 +656,7 @@ workstreams in the five task trees. Seven corrections landed.
 | 5 | Three production dependencies had no owner in any task tree: the Repo 1 control-plane host, the staging host, and the production OIDC IdP. A fourth — the `content.karyalay.site` origin split — was referenced only in Repo 2 Phase 6 despite being retrofit-impossible | **ADR-INF-033** ACCEPTED with the `idp` role conditional; Repo 3 T03.07/T03.08 in Wave 3, and new infra **T00.08** resolves the IdP question in Wave 0. Origin split wired into webmail T00.06/T00.08, its provisioning into Wave 0 |
 | 6 | Contracts T00.02 targeted 46 events; Appendix D holds 45 unique rows, so the task's own zero-divergence criterion could not pass | Corrected to 45; a 46th, if a consumer needs one, arrives via the ADR path already in the task |
 | 7 | TWD.01/TWD.02 and every AK row read ☐ in the tree while INFRASTRUCTURE-PLAN recorded the work done on 2026-08-18 | Evidence landed in the task frontmatter, the workstream README and the AK runbook |
+| 8 | Finding 5 wired the origin split into webmail but left its *provisioning* in prose — no task owned the origins, and ADR-INF-033 covers hosts, which a managed service is not. The public `karyalay.site` zone had no owner either; it is panel-edited, where two defects had already surfaced. Separately, INFRASTRUCTURE-PLAN served `mta-sts` from Pages, which spec §47 cannot support — it needs per-customer-domain policy with a tenant mapping, so the plan described something that breaks at the second customer domain | **ADR-INF-034** ACCEPTED: Repo 3 owns the public zone and the application origins on ADR-INF-033's boundary. New **T01.07** in Wave 0 — two separate Pages projects, static only, **no Pages Functions** without an ADR. `mta-sts` corrected to T05.03's service. The `api.karyalay.site` TLS-termination question was deliberately left open rather than folded in |
 
 Not changed, and worth stating: **every one of the 38 phases appears in a wave.**
 Nothing in the task trees is orphaned. The gaps found were all at the seams —
@@ -646,4 +669,7 @@ scheduling recommendation was declined: the owner kept Repo 4's Phase 0 gate
 absolute rather than carve out T00.07b, accepting that Repo 4 starts at Wave 4
 instead of Wave 2 (§7.5). Finding 5 was accepted with the `idp` role held
 conditional pending T00.08, and the host tasks placed in Phase 3 rather than
-Phase 1 so Phase 1's gate stays closeable on mail evidence alone.
+Phase 1 so Phase 1's gate stays closeable on mail evidence alone. Finding 8 was
+raised while answering whether Cloudflare Pages is a durable choice; it is, on
+one condition — **no Pages Functions** — which is now the operative clause of
+ADR-INF-034 rather than an understanding held in someone's head.

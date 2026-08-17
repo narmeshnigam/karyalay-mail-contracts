@@ -35,10 +35,10 @@ provider until Phase B, and migrates only once the platform is proven.
 | Hostname | Points to | Purpose | Cloudflare proxy |
 | --- | --- | --- | --- |
 | `mx1.karyalay.site` | Hetzner IP | SMTP (25/465/587), IMAP, PTR target | **DNS-only (grey)** |
-| `mail.karyalay.site` | Cloudflare Pages | Webmail UI | Proxied (orange) |
-| `api.karyalay.site` | Hostinger vps_server_1 | Repo 1 control-plane API | Proxied (orange) |
-| `content.karyalay.site` | Pages (separate origin) | Sandboxed message rendering | Proxied (orange) |
-| `mta-sts.karyalay.site` | Pages | MTA-STS policy host | Proxied (orange) |
+| `mail.karyalay.site` | Cloudflare Pages project A | Webmail UI | Proxied (orange) |
+| `api.karyalay.site` | Hostinger vps_server_1 | Repo 1 control-plane API | Proxied (orange) — **open decision, see below** |
+| `content.karyalay.site` | Cloudflare Pages project B | Sandboxed message rendering | Proxied (orange) |
+| `mta-sts.karyalay.site` | `mta-sts-policy` service (Repo 3 T05.03) | MTA-STS policy host | Proxied (orange) |
 
 > **Critical Cloudflare rule:** any record involved in SMTP must be **DNS-only**.
 > Cloudflare's proxy handles HTTP/HTTPS only — proxying `mx1` breaks mail
@@ -48,6 +48,35 @@ provider until Phase B, and migrates only once the platform is proven.
 sandboxed iframe. Serving that content from a **separate origin** means
 same-origin policy still protects the session even if sandboxing is bypassed.
 This cannot be retrofitted cheaply — provision it now.
+
+Both application origins are provisioned by **Repo 3 T01.07** under
+**ADR-INF-034** (`karyalay-mail-infra/docs/adr/`):
+**two separate Pages projects, static assets only, no Pages Functions.** One
+project with two custom domains would serve both names with identical headers
+from a single deployment and reduce the split to cosmetic. The no-Functions rule
+is what keeps migration to a CNAME change and a file copy; every dynamic concern
+in this architecture already belongs to Repo 1 or Repo 3, so needing a Function
+means something was placed in the wrong repository.
+
+**`mta-sts` was corrected on 2026-08-18.** It was listed as a Pages origin.
+Spec §47 requires an `mta-sts-policy` service serving per-customer-domain policy
+at `https://mta-sts.<domain>/.well-known/mta-sts.txt` with a generated tenant
+mapping — request-time multi-tenant behaviour that Pages cannot express, and
+that breaks at the second customer domain. Repo 3 T05.03 builds it.
+
+### Open decision — should `api.karyalay.site` stay proxied?
+
+Orange cloud means **Cloudflare terminates TLS on control-plane traffic** and
+sees message bodies, attachment metadata and session tokens in cleartext at the
+edge. That is materially unlike serving a JavaScript bundle, and it sits far
+closer to ADR-INF-002's line on third-party components in the production mail
+path.
+
+It may still be right — a single Hostinger VPS genuinely wants DDoS protection
+and origin-IP concealment, and grey-clouding forfeits both. But this should be a
+decision with a written rationale, not a default inherited from "everything goes
+behind Cloudflare." ADR-INF-034 deliberately does **not** settle it. Resolve
+before Phase B, and record it as a deviation if the answer is to keep the proxy.
 
 ### DNS record set for `karyalay.site`
 
@@ -60,7 +89,8 @@ This cannot be retrofitted cheaply — provision it now.
 | TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:dmarc@karyalay.site` |
 | TXT | `_mta-sts` | `v=STSv1; id=<timestamp>` |
 | TXT | `_smtp._tls` | `v=TLSRPTv1; rua=mailto:tlsrpt@karyalay.site` |
-| CNAME | `mail`, `content`, `mta-sts` | *(Cloudflare Pages targets)* |
+| CNAME | `mail`, `content` | *(two separate Cloudflare Pages projects — Repo 3 T01.07)* |
+| CNAME | `mta-sts` | *(`mta-sts-policy` service — Repo 3 T05.03, not Pages)* |
 | A | `api` | *(Hostinger vps_server_1 IP)* |
 
 Start DMARC at `p=none` and tighten to `quarantine` then `reject` only after
@@ -150,7 +180,7 @@ Legend: ☑ done · ◐ in progress · ☐ not started
 | 7 | Offline custody: OpenBao unseal keys, DKIM private key escrow | Never in the R2 bucket the server can write to |
 | 7a | **Hetzner cloud firewall + nftables baseline (§12) — HARD GATE** | Deferrable only while sshd alone is listening. Must be in place **before Redis, MariaDB, OpenBao or any other service binds a port** — an exposed unauthenticated Redis is among the most reliably exploited misconfigurations on the internet, and OpenBao holds the DKIM keys |
 | 8 | Build Repo 3 (Hetzner) → Repo 1 (vps_server_1) → Repo 2 (Pages) → staging (vps_server_3) | Host provisioning for everything except the Hetzner box is Repo 3 T03.07/T03.08 (ADR-INF-033) — it had no owner before 2026-08-18 |
-| 8a | Create the Cloudflare Pages projects and DNS for `mail.karyalay.site` **and** `content.karyalay.site` | ☐ **do this in Wave 0** — webmail Phase 0 (T00.06, T00.08) now builds against the two-origin split from its first commit, and §7 item 3 makes it retrofit-impossible |
+| 8a | Create the Cloudflare Pages projects and DNS for `mail.karyalay.site` **and** `content.karyalay.site` | ☐ **do this in Wave 0** — now owned by **Repo 3 T01.07** (ADR-INF-034). Two separate projects, static only, no Functions. Webmail Phase 0 (T00.06, T00.08) builds against the split from its first commit, and §7 item 3 makes it retrofit-impossible |
 | 9 | R2 backups running with bucket lock, **and one restore actually tested** | `VERIFIED` ≠ backup job exited zero |
 | 10 | Route real mail through `karyalay.site`; begin AK checklist; enable §63 monitoring | Reputation accrues only with calendar time |
 
@@ -294,6 +324,8 @@ To be ratified in a starter-profile ADR in `karyalay-mail-infra` before Phase B.
 | Single mailbox shard, no standby | §7 (1 active + 1 standby per shard) | Permitted by ADR-KEM-003: without proven fencing, run single-node and publish measured RPO/RTO | When fencing capability is proven |
 | Repo 4 deferred except migration tooling | Repo 4 phase plan | Its own §3 invariant states mail flows with every ops process stopped. Postmaster/SNDS dashboards replace collectors at this scale | Phase B/C |
 | Reduced Repo 1 worker count | §3.1 process roles | RAM constraint on shared Hostinger box | On control-plane upsize |
+| Public `karyalay.site` zone managed by panel, not as-code | §53 (no hand-configuration) | The as-code path does not exist yet; the zone is small and its records are reviewed in T01.07 | When zone generation from desired state ships (same trigger as the NSD row) |
+| Application origins on Cloudflare Pages | §5 self-hosted posture | Static assets only, no Functions, no message content at the edge — the renderer is client-side with a zero-network proof. Reversible by CNAME change while the no-Functions rule holds (ADR-INF-034) | If an origin ever needs compute, or a customer requires no third-party CDN |
 
 ---
 
