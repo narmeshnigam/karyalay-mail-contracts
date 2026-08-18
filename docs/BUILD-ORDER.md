@@ -289,6 +289,23 @@ T07.01 — see Wave 2.
 **Close Gate 0 here.** Each repo's first green CI run against the pinned tag is
 the evidence ADR-KEM-001 requires. Record all four.
 
+> **Built 2026-08-18.** All four repos' Phase 0 is delivered against `v0.2.1`;
+> evidence in [docs/evidence/gate-0/CLOSURE.md](evidence/gate-0/CLOSURE.md).
+>
+> | Repo | Phase 0 | Verification |
+> | --- | --- | --- |
+> | **Repo 3** | T00.01, T00.02 ☑ (T00.08 waits on a person) | 48 checks |
+> | **Repo 1** | all 8 ☑ | 53 tests, PHPStan `max`, Pint |
+> | **Repo 2** | all 8 ☑ | 42 tests, typecheck, boundary lint |
+> | **Repo 4** | 8 of 9 ☑ | 42 Go tests + 5 console |
+>
+> **Gate 0 is closed on validation, not on distribution.** Every pin resolves
+> through a sibling clone; no consumer off this machine can fetch the tag.
+>
+> **Repo 4's Phase 0 does not close.** T00.07b blocks on Repo 1 **T07.01**,
+> which is Wave 2 — the table row above saying "all 9 remaining gating tasks"
+> was the loose statement; §4's own prose two paragraphs later has it right.
+
 ---
 
 ### Wave 2 — Divergent build (maximum parallelism)
