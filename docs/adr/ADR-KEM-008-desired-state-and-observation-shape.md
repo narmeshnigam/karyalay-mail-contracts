@@ -2,11 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **PROPOSED** |
+| Status | **ACCEPTED** |
 | Date | 2026-08-18 |
 | Raised by | Gate 0 task T00.05 (internal provisioning OpenAPI) |
 | Affects | Repo 1 §12.2, §29, Appendix A.31/A.32, Appendix C.97–C.100; Repo 3 §49, §50 |
-| Approvers | Architecture owner — pending |
+| Approvers | Architecture owner — accepted 2026-08-18 |
 
 ## Context
 
@@ -121,3 +121,95 @@ once, before either side is implemented, rather than at integration.
 ## Evidence
 
 `docs/reconciliation/provisioning-interface.md`.
+
+---
+
+# Amendment 1 — resolutions surfaced during implementation
+
+The union was implemented in `v0.2.0` on 2026-08-18. Decisions 1–8 above
+resolved every divergence the ADR enumerated. Implementation surfaced two more
+that the enumeration missed, because both live in Repo 3 **Appendix O/P**,
+which §49/§50 delegate to and which the original comparison did not open.
+
+Neither is resolved by invention. Each is resolved by applying the accepted
+union principle — *take both sides; where the two spell the same concept
+differently, publish one* — and each is recorded here as an **open item** for
+confirmation, because extending an accepted decision is not the same as having
+made it.
+
+## Open item 1 — the `resource_type` vocabulary
+
+The two specifications carry different resource vocabularies, and neither the
+ADR nor the reconciliation noticed:
+
+| Concept | Repo 1 Appendix A.31 | Repo 3 Appendix O.1 | Published in `v0.2.0` |
+| --- | --- | --- | --- |
+| domain | `DOMAIN` | `domain` | `domain` |
+| mailbox | `MAILBOX` | `mailbox` | `mailbox` |
+| quota | `QUOTA` | `quota` | `quota` |
+| DKIM key | `DKIM` | `dkim_key` | **`dkim_key`** — same concept, two spellings |
+| filter set | `FILTER` | `filter_set` | **`filter_set`** — same concept, two spellings |
+| alias | — | `alias` | `alias` — Repo 3 only |
+| group | — | `group` | `group` — Repo 3 only |
+| restriction | — | `restriction` | `restriction` — Repo 3 only |
+| organisation | `ORGANISATION` | — | `organisation` — **Repo 1 only** |
+| placement | `PLACEMENT` | — | `placement` — **Repo 1 only** |
+
+Resolution applied: Repo 3's spelling wins the two collisions, because
+Appendix O.1 maps each kind to a named Repo 3 materialization and is therefore
+the side with the operational referent. Repo 1 Appendix A.31 takes the
+correction.
+
+**Open:** `organisation` and `placement` are dispatched by Repo 1 and have **no
+Appendix O.1 materialization row**. They are published so nothing is lost, but
+Repo 3 cannot currently say what it would build for either. Repo 3 either adds
+two Appendix O.1 rows or Repo 1 stops dispatching them as desired-state
+resources. This is the same class of gap as divergence 2 and should not be left
+to Wave 3 to discover.
+
+## Open item 2 — `desired_status` has no fixed vocabulary
+
+Decision 4 adopted `desired_status` from Repo 3 §49. Neither §49 (`"ACTIVE"`,
+by example) nor Appendix O.1 (`"..."`) enumerates it, and Appendix Q says only
+`"ACTIVE/RESTRICTED/DELETING etc mapped from desired state"` — the `etc` is in
+the source.
+
+Repo 1's lifecycle vocabularies are per resource and richer: Appendix A.14
+mailboxes carry
+`REQUESTED/CONFIGURING/ACTIVE/RESTRICTED/SUSPENDED/PROVISIONING_FAILED/DELETION_PENDING/RECOVERY_WINDOW/DELETED`,
+and domains a different nine.
+
+Resolution applied: `desired_status` is published as a **grammar-constrained
+string** (`^[A-Z][A-Z0-9_]*$`, ≤40) whose per-type vocabulary is that
+resource's own Appendix A lifecycle column. Enumerating a single cross-type
+set here would have invented one, which Master §0.2 forbids.
+
+**Open:** a controller cannot reject an unknown `desired_status` at the schema
+boundary, only at the projection. If a closed per-type enum is wanted, it needs
+a `resource_type`-discriminated schema and an owner ruling on whether every
+Repo 1 lifecycle value is meaningful to Repo 3.
+
+## Noted, not applied — the richer observation shape
+
+Decision 8 added `checksum` alone, on the ADR's judgement that
+`details_json` carries Repo 3 Appendix P.1's component statuses and
+`source_service` carries its `controller_instance`. That judgement was kept.
+
+Appendix P.1 is nonetheless more specific than what `v0.2.0` publishes: it
+defines `components[]` as typed entries of `{name, state, generation, checksum,
+details}` plus a `warnings[]` array. Carrying them inside a free-form
+`details_json` means neither side can validate them and per-component checksums
+stay unaddressable.
+
+Not applied, because decision 8 is what was accepted. Raise as a follow-up if
+per-component drift attribution is wanted before Repo 3 Phase 3.
+
+## What `v0.2.0` publishes
+
+`openapi/internal-provisioning-api-v1.yaml`, schemas `DesiredState`,
+`DesiredStateSpec`, `DesiredStateResourceType`, `ResourceDependency` and
+`ObservationReport`. Three validator checks pin the union
+(`tools/validate/validate.mjs`) and fail if either side's shape reappears alone.
+
+Specifications revised: Repo 1 §12.2, Appendix A.31, Appendix A.32; Repo 3
+§49, §50, Appendix O.1, Appendix P.1.

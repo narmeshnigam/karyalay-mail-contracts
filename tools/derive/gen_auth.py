@@ -162,7 +162,7 @@ def write_examples(roles):
         "auth/examples/manifest-v1.yaml",
         {
             "contract": "karyalay-mail-contracts/auth/examples",
-            "contract_version": "0.1.0",
+            "contract_version": "0.2.0",
             "validates_against": "../claims-v1.yaml",
             "purpose": "T00.03 acceptance: a sample token for every role defined in roles-v1.yaml.",
             "examples": manifest,
@@ -207,7 +207,7 @@ def main():
 
     permissions_doc = {
         "contract": "karyalay-mail-contracts/auth/permissions",
-        "contract_version": "0.1.0",
+        "contract_version": "0.2.0",
         "sources": {
             "permissions": "karyalay-mail repository-spec-v1.0 Appendix B",
             "object_relations": "karyalay-mail repository-spec-v1.0 Appendix B.1",
@@ -267,7 +267,7 @@ def main():
 
     roles_doc = {
         "contract": "karyalay-mail-contracts/auth/roles",
-        "contract_version": "0.1.0",
+        "contract_version": "0.2.0",
         "sources": {
             "role_catalog": "Karyalay Email Master Architecture & Integration Contract v1.0 §10.2, §10.3",
             "default_permissions": "karyalay-mail repository-spec-v1.0 Appendix B (inverted)",

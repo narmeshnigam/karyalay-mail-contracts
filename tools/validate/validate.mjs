@@ -241,13 +241,17 @@ check('the telemetry contract keeps repo-local metric catalogs out', () => {
 })
 
 // ------------------------------------------------- 7/8. OpenAPI
+// The pinned contract version has one source. A literal here drifts from the
+// generators the moment a release is cut, and the drift passes silently.
+const PINNED_VERSION = JSON.parse(fs.readFileSync('package.json', 'utf8')).version
+
 const openapiFiles = listFiles('openapi', '.yaml').filter((f) => !f.includes('reconciliation'))
 
 check('every OpenAPI document declares 3.1.0 and the pinned contract version', () => {
   for (const f of openapiFiles) {
     const doc = loadYaml(f)
     if (doc.openapi !== '3.1.0') throw new Error(`${f} declares ${doc.openapi}`)
-    if (doc.info?.version !== '0.1.0') throw new Error(`${f} declares info.version ${doc.info?.version}`)
+    if (doc.info?.version !== PINNED_VERSION) throw new Error(`${f} declares info.version ${doc.info?.version}, expected ${PINNED_VERSION}`)
   }
   return `${openapiFiles.length} documents`
 })
@@ -285,19 +289,118 @@ check('OpenAPI operations reconcile 1:1 with Appendix C', () => {
 })
 
 check('no OpenAPI document names an error code the catalog does not define', () => {
+  // Every `code` enum anywhere in the document, found structurally rather than
+  // at one hard-coded path. An earlier version of this check looked only at
+  // schema.allOf[1].properties.code.enum; when the generator moved to a flat
+  // per-status Problem schema the path stopped matching, the count fell to
+  // zero, and the check passed without inspecting anything.
+  const codeEnums = (node, out = []) => {
+    if (Array.isArray(node)) { for (const v of node) codeEnums(v, out); return out }
+    if (!node || typeof node !== 'object') return out
+    for (const [k, v] of Object.entries(node)) {
+      if (k === 'code' && v && Array.isArray(v.enum)) out.push(...v.enum)
+      else codeEnums(v, out)
+    }
+    return out
+  }
+
   let counted = 0
   for (const f of openapiFiles) {
     const doc = loadYaml(f)
-    for (const code of doc.components?.schemas?.ErrorCode?.enum || []) {
+    const codes = [
+      ...(doc.components?.schemas?.ErrorCode?.enum || []),
+      ...codeEnums(doc.components?.responses || {}),
+      ...codeEnums(doc.paths || {}),
+    ]
+    for (const code of codes) {
       if (!catalogCodes.has(code)) throw new Error(`${f} names ${code}, absent from errors/error-catalog-v1.yaml`)
       counted++
     }
-    for (const response of Object.values(doc.components?.responses || {})) {
-      const enums = response.content?.['application/problem+json']?.schema?.allOf?.[1]?.properties?.code?.enum || []
-      for (const code of enums) if (!catalogCodes.has(code)) throw new Error(`${f} response names ${code}, absent from the catalog`)
-    }
+    if (codes.length === 0) throw new Error(`${f} exposes no error codes at all -- the check found nothing to verify, which is a bug in the check or the generator, not a clean document`)
   }
   return `${counted} code references, all resolved`
+})
+
+check('the provisioning exchange carries the ADR-KEM-008 union, not either side alone', () => {
+  const doc = loadYaml('openapi/internal-provisioning-api-v1.yaml')
+  const S = doc.components.schemas
+  const desired = S.DesiredState
+  if (!desired) throw new Error('DesiredState absent from the provisioning document')
+
+  // Decisions 1-6: every field the union resolved, present at the envelope level.
+  const required = ['schema_version', 'resource_type', 'resource_id', 'organisation_id', 'desired_generation', 'desired_status', 'spec', 'correlation']
+  for (const k of required) {
+    if (!desired.properties[k]) throw new Error(`DesiredState is missing ${k} (ADR-KEM-008)`)
+    if (!desired.required.includes(k)) throw new Error(`DesiredState does not require ${k} (ADR-KEM-008)`)
+  }
+  if (!desired.properties.dependencies) throw new Error('DesiredState is missing dependencies (ADR-KEM-008 decision 4)')
+
+  // Decisions 2, 3, 5: the retired spellings must be gone from the envelope.
+  // "Either is defensible; publishing both is not" -- ADR-KEM-008 divergence 1.
+  for (const k of ['mailbox_id', 'generation', 'domain_id', 'storage_key', 'quota_bytes', 'auth_state', 'receive_state', 'send_state', 'filter_generation', 'primary_address']) {
+    if (desired.properties[k]) throw new Error(`DesiredState still carries ${k} at the envelope level; decision 2/5 moves type-specific and typed fields into spec`)
+  }
+  // ...and must be reachable inside spec, so nothing was dropped rather than moved.
+  const spec = S.DesiredStateSpec
+  if (!spec) throw new Error('DesiredStateSpec absent -- decision 5 nests typed fields under spec')
+  for (const k of ['mailbox_id', 'domain_id', 'storage_key', 'quota_bytes', 'auth_state', 'receive_state', 'send_state', 'filter_generation', 'primary_address']) {
+    if (!spec.properties[k]) throw new Error(`DesiredStateSpec lost ${k}; the union moves Repo 1 §12.2 fields, it does not drop them`)
+  }
+
+  // Decision 6: correlation survives. Master §30 requires it across this hop.
+  if (!desired.properties.correlation.properties?.operation_id) throw new Error('correlation lost operation_id (Master §30, decision 6)')
+
+  return `${required.length} envelope fields, ${Object.keys(spec.properties).length} nested in spec`
+})
+
+check('readiness is the seven-value union and the observation can record drift', () => {
+  const S = loadYaml('openapi/internal-provisioning-api-v1.yaml').components.schemas
+  const obs = S.ObservationReport
+  if (!obs) throw new Error('ObservationReport absent')
+
+  // Decision 7: Repo 3 §50's six, plus Repo 1 Appendix A.32's ABSENT.
+  const want = ['PENDING', 'READY', 'DEGRADED', 'FAILED', 'RESTRICTED', 'DELETING', 'ABSENT']
+  const got = obs.properties.readiness?.enum || []
+  const missing = want.filter((v) => !got.includes(v))
+  const extra = got.filter((v) => !want.includes(v))
+  if (missing.length) throw new Error(`readiness is missing ${missing.join(', ')} (ADR-KEM-008 decision 7)`)
+  if (extra.length) throw new Error(`readiness carries undeclared value(s) ${extra.join(', ')}`)
+
+  // Decision 3: desired_generation beside observed_generation, per Repo 1 §29.1's own wording.
+  for (const k of ['desired_generation', 'observed_generation', 'schema_version']) {
+    if (!obs.properties[k]) throw new Error(`ObservationReport is missing ${k}`)
+  }
+  if (obs.properties.generation) throw new Error('ObservationReport still carries the ambiguous `generation`; decision 3 splits it')
+  if (obs.properties.status) throw new Error('ObservationReport still carries `status`; decision 7 renames it readiness')
+
+  // Decision 8: checksum drift is one of Repo 3 §50's two drift triggers and
+  // Repo 1 Appendix A.32 had nowhere to record it.
+  if (!obs.properties.checksum) throw new Error('ObservationReport cannot record a checksum, so checksum-detected drift cannot be reported (decision 8)')
+
+  return `${got.length} readiness values, checksum recordable`
+})
+
+check('a dependency cannot name a resource kind the envelope cannot carry', () => {
+  const S = loadYaml('openapi/internal-provisioning-api-v1.yaml').components.schemas
+  const kinds = S.DesiredStateResourceType?.enum || []
+  if (!kinds.length) throw new Error('DesiredStateResourceType absent or empty')
+  const dep = S.ResourceDependency
+  if (!dep) throw new Error('ResourceDependency absent (ADR-KEM-008 decision 4)')
+  const ref = dep.properties.resource_type?.$ref
+  if (ref !== '#/components/schemas/DesiredStateResourceType') {
+    throw new Error(`ResourceDependency.resource_type is ${ref || 'inline'}; it must share the envelope's vocabulary or a dependency could name a kind that cannot exist`)
+  }
+  for (const k of ['resource_id', 'min_generation']) {
+    if (!dep.required.includes(k)) throw new Error(`ResourceDependency does not require ${k}`)
+  }
+  // Both source vocabularies must survive the union.
+  for (const k of ['domain', 'mailbox', 'alias', 'group', 'quota', 'filter_set', 'restriction', 'dkim_key']) {
+    if (!kinds.includes(k)) throw new Error(`resource_type lost Repo 3 Appendix O.1 kind ${k}`)
+  }
+  for (const k of ['organisation', 'placement']) {
+    if (!kinds.includes(k)) throw new Error(`resource_type lost Repo 1 Appendix A.31 kind ${k}`)
+  }
+  return `${kinds.length} resource kinds, shared by envelope and dependencies`
 })
 
 check('every operation permission resolves in permissions-v1', () => {

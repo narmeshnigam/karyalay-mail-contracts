@@ -221,14 +221,31 @@ this document defers to — reading ☐ for work that was done.
 
 ### Wave 1 — Tag lands: all four repos unblock
 
-Entry condition: `karyalay-mail-contracts v0.1.0` published and pinnable.
+Entry condition: `karyalay-mail-contracts` **`v0.2.0`** published and pinnable.
+
+> **Revised 2026-08-18.** The entry condition named `v0.1.0`. Two ADRs were
+> accepted after it was written and both changed what "the tag" means:
+>
+> - **ADR-KEM-008** (union of the desired-state and observation shapes) ships
+>   as **`v0.2.0`**, a shared-breaking release. `v0.1.0` remains published and
+>   immutable — a published tag is never moved — but its provisioning shape is
+>   superseded, so **consumers pin `v0.2.0`**. This is not optional for Repo 3:
+>   its T00.02 golden case tests `schema_version`, which `v0.1.0` has no field
+>   for.
+> - **ADR-KEM-009** freezes AI-04..AI-09 as *deferred to `v0.2.0`*, which is
+>   what contracts T00.06 asked for — a recorded disposition with a target tag,
+>   not silence. Repo 4's eight gating Phase 0 tasks no longer carry that
+>   blocker.
+>
+> The remaining half of the entry condition is unchanged and unmet: **no repo
+> has a git remote**, so no tag is pinnable by anyone yet.
 
 | Repo | What opens | Notes |
 | --- | --- | --- |
-| **Repo 3** | T00.01, T00.02 → Phase 0 gate → **Phase 2** | Phase 1 already ran in Wave 0; the tag unblocks the mail vertical slice |
-| **Repo 1** | Phase 0, all 8 remaining tasks | T00.01 boot → T00.02/T00.03/T00.05/T00.08 → T00.04, T00.06 |
-| **Repo 2** | Phase 0, all 8 remaining tasks | T00.01 toolchain → T00.03 generated client → T00.05 auth → T00.06 shell |
-| **Repo 4** | Phase 0, all 9 remaining gating tasks | Needs the AI-04..AI-09 freeze too — that ships *with* the tag via contracts T00.06 |
+| **Repo 3** | T00.01, T00.02 → Phase 0 gate → **Phase 2** | Phase 1 already ran in Wave 0. T00.02 pins `v0.2.0`; against `v0.1.0` its `schema_version` golden case is unwritable |
+| **Repo 1** | Phase 0, all 8 remaining tasks | T00.01 boot → T00.02/T00.03/T00.05/T00.08 → T00.04, T00.06. Does not consume the provisioning document, so unaffected by KEM-008 |
+| **Repo 2** | Phase 0, all 8 remaining tasks | T00.01 toolchain → T00.03 generated client → T00.05 auth → T00.06 shell. Also unaffected by KEM-008 |
+| **Repo 4** | Phase 0, all 9 remaining gating tasks | AI-04..AI-09 cleared by ADR-KEM-009; the *execution* phases (1, 2, 4, 5) stay blocked on the executors themselves. Repo 4 still joins at Wave 4 under ADR-OPS-022 |
 
 **Repo 4's extra catch, corrected.** Its typed-clients task listed `Repo 1 APIs`
 as a third blocker. Two things were wrong with how that was scheduled:
@@ -441,7 +458,7 @@ The complete set. Everything not listed here is independent.
 
 | Blocked | Waits on | Escape hatch |
 | --- | --- | --- |
-| Repo 1/2/4 **Phase 0**, Repo 3 **Phase 0 exit** | contracts `v0.1.0` tag | **none — the real gate** |
+| Repo 1/2/4 **Phase 0**, Repo 3 **Phase 0 exit** | contracts `v0.2.0` tag, pushed to a reachable remote | **none — the real gate** |
 | Repo 4 **Phase 0** | + AI-04..AI-09 frozen (contracts T00.05 → T00.06) | none |
 | Repo 3 **T00.01, T00.02** | contracts tag | none |
 | Repo 3 **Phase 1** | T00.03 + T00.04 only | ✅ **not tag-blocked — runs in Wave 0** |

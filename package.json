@@ -1,6 +1,6 @@
 {
   "name": "karyalay-mail-contracts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shared contract authority for Karyalay Email. Toolchain only; the contracts themselves are language-neutral files.",
   "directories": {
     "doc": "docs"

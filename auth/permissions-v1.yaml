@@ -5,7 +5,7 @@
 # Filename fixed by Master Contract §0.3.
 
 contract: karyalay-mail-contracts/auth/permissions
-contract_version: 0.1.0
+contract_version: 0.2.0
 sources:
   permissions: karyalay-mail repository-spec-v1.0 Appendix B
   object_relations: karyalay-mail repository-spec-v1.0 Appendix B.1

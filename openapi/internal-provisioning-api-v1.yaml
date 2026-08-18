@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — internal provisioning API"
-  version: 0.1.0
+  version: 0.2.0
   summary: "The desired-state and observation exchange with karyalay-mail-infra, plus service liveness, readiness and version."
   description: "The desired-state and observation exchange with karyalay-mail-infra, plus service liveness, readiness and version.\n\n**Source:** karyalay-mail repository-spec-v1.0 §29, Appendix C.97-C.100 and C.105-C.107; karyalay-mail-infra §48-§51.\n**Audience:** karyalay-mail-infra service identities. Not a public route; a user access token with the wrong audience or client is rejected (Repo 1 §29.2).\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 7 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.1.0
+  x-karyalay-contract-version: 0.2.0
 servers:
   - url: https://internal.mail.karyalay.in
     description: Production.
@@ -551,39 +551,81 @@ components:
       "$comment": "Source: Repo 1 §29."
     DesiredState:
       type: object
-      description: "The desired-state document Infra reconciles toward. The control plane may not send arbitrary config fragments or shell commands (Repo 1 §12.2)."
+      description: "The desired-state document Infra reconciles toward. The control plane may not send arbitrary config fragments or shell commands (Repo 1 §12.2). Unified shape per ADR-KEM-008."
       properties:
+        schema_version:
+          type: integer
+          minimum: 1
+          description: "Envelope version. Repo 3 §49: an unknown schema version is nonretryable until code upgrade, and the controller MUST NOT guess."
         resource_type:
+          "$ref": "#/components/schemas/DesiredStateResourceType"
+        resource_id:
           type: string
-          enum:
-            - organisation
-            - domain
-            - mailbox
-            - dkim
-            - filter
-            - quota
-            - placement
+          format: uuid
         organisation_id:
           type: string
           format: uuid
+        desired_generation:
+          type: integer
+          minimum: 0
+        desired_status:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]*$"
+          maxLength: 40
+          description: "Target lifecycle state for this resource. The vocabulary is per resource type and is Repo 1's Appendix A lifecycle column for that resource (for example A.14 mailboxes REQUESTED/CONFIGURING/ACTIVE/RESTRICTED/SUSPENDED/PROVISIONING_FAILED/DELETION_PENDING/RECOVERY_WINDOW/DELETED). Neither Repo 3 Appendix O.1 nor Appendix Q fixes a single cross-type enum — Appendix Q says \"ACTIVE/RESTRICTED/DELETING etc mapped from desired state\" — so this is constrained by grammar, not enumerated. See ADR-KEM-008 Amendment 1 open item 2."
+        dependencies:
+          type: array
+          maxItems: 32
+          items:
+            "$ref": "#/components/schemas/ResourceDependency"
+          description: "Prerequisites that must have converged to at least min_generation before this resource is exposed (Repo 3 §49)."
+        spec:
+          "$ref": "#/components/schemas/DesiredStateSpec"
+        correlation:
+          type: object
+          description: "Correlation for the reconciliation attempt. Master §30 requires the correlation to survive this hop; Repo 3 §49 omits it, and ADR-KEM-008 decision 6 keeps Repo 1's."
+          properties:
+            operation_id:
+              type: string
+              format: uuid
+            trace_id:
+              type: string
+              pattern: "^[0-9a-f]{32}$"
+          required:
+            - operation_id
+      required:
+        - schema_version
+        - resource_type
+        - resource_id
+        - organisation_id
+        - desired_generation
+        - desired_status
+        - spec
+        - correlation
+      "$comment": "Source: Repo 1 §12.2 unified with Repo 3 §49 / Appendix O.1 per ADR-KEM-008."
+    DesiredStateSpec:
+      type: object
+      description: "Typed resource fields, nested per Repo 3 Appendix O.1 (ADR-KEM-008 decision 5). Type-specific identity keys live here; the envelope carries only the uniform resource_id. Fields present depend on resource_type; Repo 3 Appendix O.1 tabulates the minimum set each kind requires."
+      properties:
         domain_id:
           oneOf:
             - type: string
               format: uuid
             - type: "null"
+          description: "Parent domain. Repo 3 Appendix O.1 requires it in the mailbox, alias and group spec."
         mailbox_id:
           oneOf:
             - type: string
               format: uuid
             - type: "null"
-        generation:
-          type: integer
-          minimum: 0
+          description: "Repo 1 §12.2's type-specific key, relocated here by ADR-KEM-008 decision 2."
         storage_key:
           oneOf:
             - type: string
+              pattern: "^[A-Za-z0-9._-]+$"
+              maxLength: 128
             - type: "null"
-          description: Opaque.
+          description: "Opaque. Repo 3 Appendix O.2: cannot contain '/', '..', NUL or shell metacharacter semantics."
         primary_address:
           oneOf:
             - type: string
@@ -594,6 +636,7 @@ components:
             - type: integer
               minimum: 0
             - type: "null"
+          description: "Nonnegative and bounded by infrastructure maximum (Repo 3 Appendix O.2)."
         auth_state:
           type: string
           enum:
@@ -614,27 +657,39 @@ components:
             - type: integer
               minimum: 0
             - type: "null"
-        correlation:
-          type: object
-          description: Correlation for the reconciliation attempt.
-          properties:
-            operation_id:
-              type: string
-              format: uuid
-            trace_id:
-              type: string
-              pattern: "^[0-9a-f]{32}$"
-          required:
-            - operation_id
+      "$comment": "Source: Repo 1 §12.2 typed fields, nested per Repo 3 Appendix O.1."
+    ResourceDependency:
+      type: object
+      description: "A prerequisite this resource must not be exposed ahead of. Repo 3 §49: dependency generations \"prevent exposing a mailbox before domain/routing/key prerequisites have converged\"."
+      properties:
+        resource_type:
+          "$ref": "#/components/schemas/DesiredStateResourceType"
+        resource_id:
+          type: string
+          format: uuid
+        min_generation:
+          type: integer
+          minimum: 0
       required:
         - resource_type
-        - organisation_id
-        - generation
-        - auth_state
-        - receive_state
-        - send_state
-        - correlation
-      "$comment": "Source: Repo 1 §12.2 desired-state shape."
+        - resource_id
+        - min_generation
+      "$comment": "Source: Repo 3 §49 / Appendix O.1 dependencies[]; adopted by ADR-KEM-008 decision 4."
+    DesiredStateResourceType:
+      type: string
+      description: "Resource kinds carried by this exchange. Repo 3 Appendix O.1 spells the eight it materializes; Repo 1 Appendix A.31 spells seven it dispatches. ADR-KEM-008 Amendment 1 unifies them on Repo 3's spelling where the two name the same concept (dkim_key, filter_set) and keeps the two Repo 1 kinds Repo 3 has no materialization row for."
+      enum:
+        - organisation
+        - domain
+        - mailbox
+        - alias
+        - group
+        - quota
+        - filter_set
+        - restriction
+        - dkim_key
+        - placement
+      "$comment": "Source: Repo 3 Appendix O.1 resource_type union Repo 1 Appendix A.31 resource_type. organisation and placement are Repo 1-only and carry no Repo 3 Appendix O.1 materialization row — see ADR-KEM-008 Amendment 1 open item 1."
     ObservationAccepted:
       type: object
       description: "Acknowledgement of an observation, including whether it superseded the stored one."
@@ -653,33 +708,53 @@ components:
       "$comment": "Source: Repo 1 §29.3."
     ObservationReport:
       type: object
-      description: "An observation of real infrastructure state, reported by a service identity."
+      description: "An observation of real infrastructure state, reported by a service identity. Unified shape per ADR-KEM-008."
       properties:
-        generation:
+        schema_version:
+          type: integer
+          minimum: 1
+          description: "Envelope version (Repo 3 Appendix P.1)."
+        desired_generation:
           type: integer
           minimum: 0
-        status:
+        observed_generation:
+          type: integer
+          minimum: 0
+        readiness:
           type: string
           enum:
+            - PENDING
             - READY
             - DEGRADED
             - FAILED
+            - RESTRICTED
+            - DELETING
             - ABSENT
+          description: "Repo 3 §50's six readiness values plus Repo 1 Appendix A.32's ABSENT (ADR-KEM-008 decision 7). ABSENT means observed to not exist and is not a synonym for PENDING: a resource never created and one mid-convergence require different operator responses."
+        checksum:
+          oneOf:
+            - type: string
+              pattern: "^sha256:[0-9a-f]{64}$"
+            - type: "null"
+          description: "Checksum of the active generated state. Repo 3 §50 names checksum difference as one of its two drift triggers; Repo 1 Appendix A.32 had no column for it (ADR-KEM-008 decision 8)."
         details:
           type: object
-          description: "Safe bounded diagnostics. No raw daemon configuration or secrets (Repo 1 §29.2)."
+          description: "Safe bounded diagnostics. No raw daemon configuration or secrets (Repo 1 §29.2). Carries Repo 3 Appendix P.1 component statuses."
         source_service:
           type: string
           maxLength: 64
+          description: Observer. Carries Repo 3 Appendix P.1 controller_instance.
         observed_at:
           type: string
           format: date-time
       required:
-        - generation
-        - status
+        - schema_version
+        - desired_generation
+        - observed_generation
+        - readiness
         - source_service
         - observed_at
-      "$comment": "Source: Repo 1 Appendix A.32 observed_resource_states; §29.1-§29.3."
+      "$comment": "Source: Repo 1 Appendix A.32 / §29.1-§29.3 unified with Repo 3 §50 / Appendix P.1 per ADR-KEM-008."
   headers:
     RequestId:
       description: "Echo of the accepted or generated `X-Request-ID` (Repo 1 §26, Master §20.7)."

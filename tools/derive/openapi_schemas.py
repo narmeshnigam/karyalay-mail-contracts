@@ -947,41 +947,128 @@ SCHEMAS = {
     ),
 
     # --- internal ---------------------------------------------------------
-    "DesiredState": _obj(
-        "The desired-state document Infra reconciles toward. The control plane may not send arbitrary config fragments or shell commands (Repo 1 §12.2).",
+    "ResourceDependency": _obj(
+        "A prerequisite this resource must not be exposed ahead of. Repo 3 §49: dependency generations \"prevent exposing a mailbox before domain/routing/key prerequisites have converged\".",
         {
-            "resource_type": {"type": "string", "enum": ["organisation", "domain", "mailbox", "dkim", "filter", "quota", "placement"]},
+            "resource_type": {"$ref": "#/components/schemas/DesiredStateResourceType"},
+            "resource_id": UUID,
+            "min_generation": GENERATION,
+        },
+        ["resource_type", "resource_id", "min_generation"],
+        "Repo 3 §49 / Appendix O.1 dependencies[]; adopted by ADR-KEM-008 decision 4",
+    ),
+    "DesiredStateResourceType": {
+        "type": "string",
+        "description": (
+            "Resource kinds carried by this exchange. Repo 3 Appendix O.1 spells the eight it "
+            "materializes; Repo 1 Appendix A.31 spells seven it dispatches. ADR-KEM-008 Amendment 1 "
+            "unifies them on Repo 3's spelling where the two name the same concept (dkim_key, "
+            "filter_set) and keeps the two Repo 1 kinds Repo 3 has no materialization row for."
+        ),
+        "enum": [
+            "organisation",
+            "domain",
+            "mailbox",
+            "alias",
+            "group",
+            "quota",
+            "filter_set",
+            "restriction",
+            "dkim_key",
+            "placement",
+        ],
+        "$comment": (
+            "Source: Repo 3 Appendix O.1 resource_type union Repo 1 Appendix A.31 resource_type. "
+            "organisation and placement are Repo 1-only and carry no Repo 3 Appendix O.1 "
+            "materialization row — see ADR-KEM-008 Amendment 1 open item 1."
+        ),
+    },
+    "DesiredState": _obj(
+        "The desired-state document Infra reconciles toward. The control plane may not send arbitrary config fragments or shell commands (Repo 1 §12.2). Unified shape per ADR-KEM-008.",
+        {
+            "schema_version": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Envelope version. Repo 3 §49: an unknown schema version is nonretryable until code upgrade, and the controller MUST NOT guess.",
+            },
+            "resource_type": {"$ref": "#/components/schemas/DesiredStateResourceType"},
+            "resource_id": UUID,
             "organisation_id": UUID,
-            "domain_id": {"oneOf": [UUID, {"type": "null"}]},
-            "mailbox_id": {"oneOf": [UUID, {"type": "null"}]},
-            "generation": GENERATION,
-            "storage_key": {"oneOf": [{"type": "string"}, {"type": "null"}], "description": "Opaque."},
-            "primary_address": {"oneOf": [{"type": "string", "format": "idn-email"}, {"type": "null"}]},
-            "quota_bytes": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
-            "auth_state": {"type": "string", "enum": ["enabled", "disabled"]},
-            "receive_state": {"type": "string", "enum": ["enabled", "disabled"]},
-            "send_state": {"type": "string", "enum": ["enabled", "disabled"]},
-            "filter_generation": {"oneOf": [GENERATION, {"type": "null"}]},
+            "desired_generation": GENERATION,
+            "desired_status": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*$",
+                "maxLength": 40,
+                "description": (
+                    "Target lifecycle state for this resource. The vocabulary is per resource type and "
+                    "is Repo 1's Appendix A lifecycle column for that resource (for example A.14 mailboxes "
+                    "REQUESTED/CONFIGURING/ACTIVE/RESTRICTED/SUSPENDED/PROVISIONING_FAILED/DELETION_PENDING/"
+                    "RECOVERY_WINDOW/DELETED). Neither Repo 3 Appendix O.1 nor Appendix Q fixes a single "
+                    "cross-type enum — Appendix Q says \"ACTIVE/RESTRICTED/DELETING etc mapped from desired "
+                    "state\" — so this is constrained by grammar, not enumerated. See ADR-KEM-008 "
+                    "Amendment 1 open item 2."
+                ),
+            },
+            "dependencies": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {"$ref": "#/components/schemas/ResourceDependency"},
+                "description": "Prerequisites that must have converged to at least min_generation before this resource is exposed (Repo 3 §49).",
+            },
+            "spec": {"$ref": "#/components/schemas/DesiredStateSpec"},
             "correlation": _obj(
-                "Correlation for the reconciliation attempt.",
+                "Correlation for the reconciliation attempt. Master §30 requires the correlation to survive this hop; Repo 3 §49 omits it, and ADR-KEM-008 decision 6 keeps Repo 1's.",
                 {"operation_id": UUID, "trace_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"}},
                 ["operation_id"],
             ),
         },
-        ["resource_type", "organisation_id", "generation", "auth_state", "receive_state", "send_state", "correlation"],
-        "Repo 1 §12.2 desired-state shape",
+        ["schema_version", "resource_type", "resource_id", "organisation_id", "desired_generation", "desired_status", "spec", "correlation"],
+        "Repo 1 §12.2 unified with Repo 3 §49 / Appendix O.1 per ADR-KEM-008",
+    ),
+    "DesiredStateSpec": _obj(
+        "Typed resource fields, nested per Repo 3 Appendix O.1 (ADR-KEM-008 decision 5). Type-specific identity keys live here; the envelope carries only the uniform resource_id. Fields present depend on resource_type; Repo 3 Appendix O.1 tabulates the minimum set each kind requires.",
+        {
+            "domain_id": {"oneOf": [UUID, {"type": "null"}], "description": "Parent domain. Repo 3 Appendix O.1 requires it in the mailbox, alias and group spec."},
+            "mailbox_id": {"oneOf": [UUID, {"type": "null"}], "description": "Repo 1 §12.2's type-specific key, relocated here by ADR-KEM-008 decision 2."},
+            "storage_key": {
+                "oneOf": [{"type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 128}, {"type": "null"}],
+                "description": "Opaque. Repo 3 Appendix O.2: cannot contain '/', '..', NUL or shell metacharacter semantics.",
+            },
+            "primary_address": {"oneOf": [{"type": "string", "format": "idn-email"}, {"type": "null"}]},
+            "quota_bytes": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}], "description": "Nonnegative and bounded by infrastructure maximum (Repo 3 Appendix O.2)."},
+            "auth_state": {"type": "string", "enum": ["enabled", "disabled"]},
+            "receive_state": {"type": "string", "enum": ["enabled", "disabled"]},
+            "send_state": {"type": "string", "enum": ["enabled", "disabled"]},
+            "filter_generation": {"oneOf": [GENERATION, {"type": "null"}]},
+        },
+        None,
+        "Repo 1 §12.2 typed fields, nested per Repo 3 Appendix O.1",
     ),
     "ObservationReport": _obj(
-        "An observation of real infrastructure state, reported by a service identity.",
+        "An observation of real infrastructure state, reported by a service identity. Unified shape per ADR-KEM-008.",
         {
-            "generation": GENERATION,
-            "status": {"type": "string", "enum": ["READY", "DEGRADED", "FAILED", "ABSENT"]},
-            "details": {"type": "object", "description": "Safe bounded diagnostics. No raw daemon configuration or secrets (Repo 1 §29.2)."},
-            "source_service": {"type": "string", "maxLength": 64},
+            "schema_version": {"type": "integer", "minimum": 1, "description": "Envelope version (Repo 3 Appendix P.1)."},
+            "desired_generation": GENERATION,
+            "observed_generation": GENERATION,
+            "readiness": {
+                "type": "string",
+                "enum": ["PENDING", "READY", "DEGRADED", "FAILED", "RESTRICTED", "DELETING", "ABSENT"],
+                "description": (
+                    "Repo 3 §50's six readiness values plus Repo 1 Appendix A.32's ABSENT (ADR-KEM-008 "
+                    "decision 7). ABSENT means observed to not exist and is not a synonym for PENDING: a "
+                    "resource never created and one mid-convergence require different operator responses."
+                ),
+            },
+            "checksum": {
+                "oneOf": [{"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}, {"type": "null"}],
+                "description": "Checksum of the active generated state. Repo 3 §50 names checksum difference as one of its two drift triggers; Repo 1 Appendix A.32 had no column for it (ADR-KEM-008 decision 8).",
+            },
+            "details": {"type": "object", "description": "Safe bounded diagnostics. No raw daemon configuration or secrets (Repo 1 §29.2). Carries Repo 3 Appendix P.1 component statuses."},
+            "source_service": {"type": "string", "maxLength": 64, "description": "Observer. Carries Repo 3 Appendix P.1 controller_instance."},
             "observed_at": TS,
         },
-        ["generation", "status", "source_service", "observed_at"],
-        "Repo 1 Appendix A.32 observed_resource_states; §29.1-§29.3",
+        ["schema_version", "desired_generation", "observed_generation", "readiness", "source_service", "observed_at"],
+        "Repo 1 Appendix A.32 / §29.1-§29.3 unified with Repo 3 §50 / Appendix P.1 per ADR-KEM-008",
     ),
     "ObservationAccepted": _obj(
         "Acknowledgement of an observation, including whether it superseded the stored one.",

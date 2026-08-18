@@ -2,11 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **PROPOSED** |
+| Status | **ACCEPTED** |
 | Date | 2026-08-18 |
 | Raised by | Gate 0 task T00.06 (freeze the ops executor interface deltas) |
 | Affects | Repo 4 Appendix AI (AI-04..AI-09); Repo 3 Appendix AB; Repo 4 Phase 0 |
-| Approvers | Architecture owner — pending |
+| Approvers | Architecture owner — accepted 2026-08-18 |
 
 ## Context
 

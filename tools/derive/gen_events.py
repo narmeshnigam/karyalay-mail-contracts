@@ -205,7 +205,7 @@ def main():
 
     index = {
         "contract": "karyalay-mail-contracts/events",
-        "contract_version": "0.1.0",
+        "contract_version": "0.2.0",
         "sources": {
             "envelope": "Karyalay Email Master Architecture & Integration Contract v1.0 §22.3",
             "catalog": "karyalay-mail repository-spec-v1.0 Appendix D",
