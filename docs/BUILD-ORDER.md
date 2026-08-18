@@ -221,7 +221,7 @@ this document defers to — reading ☐ for work that was done.
 
 ### Wave 1 — Tag lands: all four repos unblock
 
-Entry condition: `karyalay-mail-contracts` **`v0.2.0`** published and pinnable.
+Entry condition: `karyalay-mail-contracts` **`v0.2.1`** published and pinnable.
 
 > **Revised 2026-08-18.** The entry condition named `v0.1.0`. Two ADRs were
 > accepted after it was written and both changed what "the tag" means:
@@ -232,17 +232,31 @@ Entry condition: `karyalay-mail-contracts` **`v0.2.0`** published and pinnable.
 >   superseded, so **consumers pin `v0.2.0`**. This is not optional for Repo 3:
 >   its T00.02 golden case tests `schema_version`, which `v0.1.0` has no field
 >   for.
-> - **ADR-KEM-009** freezes AI-04..AI-09 as *deferred to `v0.2.0`*, which is
+> - **ADR-KEM-009** freezes AI-04..AI-09 as *deferred to `v0.2.x`*, which is
 >   what contracts T00.06 asked for — a recorded disposition with a target tag,
 >   not silence. Repo 4's eight gating Phase 0 tasks no longer carry that
 >   blocker.
 >
-> The remaining half of the entry condition is unchanged and unmet: **no repo
-> has a git remote**, so no tag is pinnable by anyone yet.
+> **Superseded 2026-08-18 by `v0.2.1`.** Wiring the first consumer pin
+> surfaced that `v0.2.0` declared two different versions of itself — the two
+> hand-authored artifacts (`observability/`, `dns/`) still said `0.1.0`,
+> because they sit outside the regeneration stage and the version check read
+> only OpenAPI `info.version`. `v0.2.1` is shared-compatible, byte-identical
+> in every wire shape, and gives the version one source. **Consumers pin
+> `v0.2.1`.**
+>
+> The remaining half of the entry condition is **satisfied differently than
+> planned**: no repo has a git remote, so the pin resolves through a local
+> `file://` source recorded in each consumer's pin file. The pin names the
+> tag, the tag's commit SHA and a SHA-256 per vendored artifact, so the
+> switch to an `https://` remote changes one field and the digests prove
+> nothing else moved. This is a recorded deviation, not a workaround: the
+> immutability the pin rule protects comes from the digests, which hold
+> regardless of transport.
 
 | Repo | What opens | Notes |
 | --- | --- | --- |
-| **Repo 3** | T00.01, T00.02 → Phase 0 gate → **Phase 2** | Phase 1 already ran in Wave 0. T00.02 pins `v0.2.0`; against `v0.1.0` its `schema_version` golden case is unwritable |
+| **Repo 3** | T00.01, T00.02 → Phase 0 gate → **Phase 2** | Phase 1 already ran in Wave 0. T00.02 pins `v0.2.1`; against `v0.1.0` its `schema_version` golden case is unwritable |
 | **Repo 1** | Phase 0, all 8 remaining tasks | T00.01 boot → T00.02/T00.03/T00.05/T00.08 → T00.04, T00.06. Does not consume the provisioning document, so unaffected by KEM-008 |
 | **Repo 2** | Phase 0, all 8 remaining tasks | T00.01 toolchain → T00.03 generated client → T00.05 auth → T00.06 shell. Also unaffected by KEM-008 |
 | **Repo 4** | Phase 0, all 9 remaining gating tasks | AI-04..AI-09 cleared by ADR-KEM-009; the *execution* phases (1, 2, 4, 5) stay blocked on the executors themselves. Repo 4 still joins at Wave 4 under ADR-OPS-022 |
@@ -458,7 +472,7 @@ The complete set. Everything not listed here is independent.
 
 | Blocked | Waits on | Escape hatch |
 | --- | --- | --- |
-| Repo 1/2/4 **Phase 0**, Repo 3 **Phase 0 exit** | contracts `v0.2.0` tag, pushed to a reachable remote | **none — the real gate** |
+| Repo 1/2/4 **Phase 0**, Repo 3 **Phase 0 exit** | contracts `v0.2.1` tag, resolvable by every consumer | **none — the real gate** |
 | Repo 4 **Phase 0** | + AI-04..AI-09 frozen (contracts T00.05 → T00.06) | none |
 | Repo 3 **T00.01, T00.02** | contracts tag | none |
 | Repo 3 **Phase 1** | T00.03 + T00.04 only | ✅ **not tag-blocked — runs in Wave 0** |
