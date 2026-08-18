@@ -18,6 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history. A shallow clone makes every file look added at HEAD,
+          # so the commit-scoped fingerprints in .gitleaksignore stop matching
+          # and every false positive returns. More importantly, a depth-1 scan
+          # cannot find a credential that was committed and later deleted --
+          # which is most of what scanning history is for.
+          fetch-depth: 0
+
 
       - uses: actions/setup-node@v4
         with:
