@@ -20,6 +20,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import specmd
+from version import CONTRACT_VERSION
 
 ROLE_TOKEN = re.compile(r"^([a-z][a-z0-9_]*)(?=$|[\s(])")
 BARE_ROLE = re.compile(r"[a-z][a-z0-9_]*(\s*\(.+\))?")
@@ -162,7 +163,7 @@ def write_examples(roles):
         "auth/examples/manifest-v1.yaml",
         {
             "contract": "karyalay-mail-contracts/auth/examples",
-            "contract_version": "0.2.0",
+            "contract_version": CONTRACT_VERSION,
             "validates_against": "../claims-v1.yaml",
             "purpose": "T00.03 acceptance: a sample token for every role defined in roles-v1.yaml.",
             "examples": manifest,
@@ -207,7 +208,7 @@ def main():
 
     permissions_doc = {
         "contract": "karyalay-mail-contracts/auth/permissions",
-        "contract_version": "0.2.0",
+        "contract_version": CONTRACT_VERSION,
         "sources": {
             "permissions": "karyalay-mail repository-spec-v1.0 Appendix B",
             "object_relations": "karyalay-mail repository-spec-v1.0 Appendix B.1",
@@ -267,7 +268,7 @@ def main():
 
     roles_doc = {
         "contract": "karyalay-mail-contracts/auth/roles",
-        "contract_version": "0.2.0",
+        "contract_version": CONTRACT_VERSION,
         "sources": {
             "role_catalog": "Karyalay Email Master Architecture & Integration Contract v1.0 §10.2, §10.3",
             "default_permissions": "karyalay-mail repository-spec-v1.0 Appendix B (inverted)",

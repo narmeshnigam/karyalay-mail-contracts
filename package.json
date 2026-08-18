@@ -1,12 +1,12 @@
 {
   "name": "karyalay-mail-contracts",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Shared contract authority for Karyalay Email. Toolchain only; the contracts themselves are language-neutral files.",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "derive": "python3 tools/derive/gen_errors.py && python3 tools/derive/gen_events.py && python3 tools/derive/gen_auth.py && python3 tools/derive/gen_openapi.py",
+    "derive": "python3 tools/derive/gen_errors.py && python3 tools/derive/gen_events.py && python3 tools/derive/gen_auth.py && python3 tools/derive/gen_openapi.py && python3 tools/derive/stamp_handauthored.py",
     "validate": "node tools/validate/validate.mjs",
     "lint": "redocly lint",
     "check": "npm run validate && npm run lint"

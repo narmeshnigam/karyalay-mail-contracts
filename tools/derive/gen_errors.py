@@ -18,6 +18,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 import specmd
+from version import CONTRACT_VERSION
 
 TYPE_URI_TEMPLATE = "https://errors.karyalay.in/mail/{code}"
 
@@ -105,7 +106,7 @@ def main():
 
     catalog = {
         "contract": "karyalay-mail-contracts/errors",
-        "contract_version": "0.2.0",
+        "contract_version": CONTRACT_VERSION,
         "type_uri_template": TYPE_URI_TEMPLATE,
         "sources": {
             "codes": "karyalay-mail repository-spec-v1.0 Appendix E",

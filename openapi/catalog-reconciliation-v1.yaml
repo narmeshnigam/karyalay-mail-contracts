@@ -5,7 +5,7 @@
 # if any row's operationId is absent from the document it names.
 
 contract: karyalay-mail-contracts/openapi
-contract_version: 0.2.0
+contract_version: 0.2.1
 source: karyalay-mail repository-spec-v1.0 Appendix C
 declared_operation_count: 107
 emitted_operation_count: 107

@@ -28,7 +28,7 @@ import specmd
 from openapi_schemas import SCHEMAS
 from openapi_ops import OPS, QUERY, PUBLIC, MAILBOX, PROVISIONING, OPERATIONS
 
-CONTRACT_VERSION = "0.2.0"
+from version import CONTRACT_VERSION  # the one source; see version.py
 
 DOCUMENTS = {
     PUBLIC: {

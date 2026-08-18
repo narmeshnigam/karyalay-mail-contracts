@@ -13,6 +13,35 @@ patch, a minor or a master-contract revision.
 Consumers pin a tag (Master §0.3). A published tag is never moved — a
 correction ships as the next patch version.
 
+## v0.2.1 — 2026-08-18
+
+**Shared compatible.** No shape change. Every schema, operation, enum and
+required-field list is byte-identical to `v0.2.0`; only the declared version
+strings and the toolchain that writes them changed.
+
+`v0.2.0` shipped declaring two different versions of itself. Six artifacts
+said `0.2.0`; `observability/telemetry-contract-v1.yaml` and
+`dns/domain-record-contract-v1.yaml` still said `0.1.0`. Both are
+hand-authored from prose rather than generated, so the regeneration stage
+never inspected them, and the version check read only OpenAPI `info.version`
+— so nothing in CI compared an artifact's self-declared version against the
+release it was shipping in.
+
+A consumer that vendors the telemetry contract and the provisioning document
+out of one tag and reads two different versions has no way to decide which is
+authoritative. That is why this is a release and not a follow-up commit:
+`v0.2.0` is published and immutable, and a correction ships as the next patch.
+
+| Change | Detail |
+| --- | --- |
+| Version has one source | `tools/derive/version.py` reads `package.json`. The five generator literals and the two hand-authored files no longer define it independently — there were eight sources of truth for one number. |
+| Hand-authored artifacts are stamped | `tools/derive/stamp_handauthored.py` rewrites the `contract_version:` line in the two prose-derived files and runs as part of `derive`, so the regeneration stage now covers them exactly like a generated file. |
+| CI catches the drift class | New check `every versioned artifact declares the release it ships in` walks every artifact declaring a version and holds all of them to `package.json`. It fails if fewer than six artifacts are inspected, so it cannot go vacuous the way the error-code check did. |
+
+**Consumer action.** Pin **`v0.2.1`**. Migrating from `v0.2.0` requires no code
+change — the wire shapes are identical. Migrating from `v0.1.0` is the
+`v0.2.0` migration below, unchanged.
+
 ## v0.2.0 — 2026-08-18
 
 **Shared breaking.** Scope is `openapi/internal-provisioning-api-v1.yaml`

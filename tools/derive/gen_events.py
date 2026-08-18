@@ -20,6 +20,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import specmd
 from fieldtypes import FIELDS
+from version import CONTRACT_VERSION
 
 STREAM = "KARYALAY_MAIL_EVENTS_V1"
 SUBJECT_PREFIX = "mail.v1"
@@ -205,7 +206,7 @@ def main():
 
     index = {
         "contract": "karyalay-mail-contracts/events",
-        "contract_version": "0.2.0",
+        "contract_version": CONTRACT_VERSION,
         "sources": {
             "envelope": "Karyalay Email Master Architecture & Integration Contract v1.0 §22.3",
             "catalog": "karyalay-mail repository-spec-v1.0 Appendix D",

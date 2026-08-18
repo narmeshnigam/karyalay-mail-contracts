@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — public control API"
-  version: 0.2.0
+  version: 0.2.1
   summary: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions."
   description: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions.\n\n**Source:** karyalay-mail repository-spec-v1.0 §26-§27, Appendix C.1-C.65 and C.92-C.96.\n**Audience:** Browser and API clients acting for a customer principal.\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 70 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.2.0
+  x-karyalay-contract-version: 0.2.1
 servers:
   - url: https://api.mail.karyalay.in
     description: Production.

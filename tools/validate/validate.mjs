@@ -256,6 +256,35 @@ check('every OpenAPI document declares 3.1.0 and the pinned contract version', (
   return `${openapiFiles.length} documents`
 })
 
+check('every versioned artifact declares the release it ships in', () => {
+  // v0.2.0 shipped with observability/ and dns/ still declaring 0.1.0. Nothing
+  // caught it: the version check above only reads OpenAPI info.version, and
+  // those two files are hand-authored, so the regeneration stage never saw
+  // them either. A consumer reading two versions out of one tag cannot tell
+  // which is authoritative, so this walks every artifact that declares a
+  // version at all and holds all of them to package.json.
+  const declared = []
+  for (const f of [...listFiles('auth', '.yaml'), ...listFiles('dns', '.yaml'), ...listFiles('errors', '.yaml'), ...listFiles('events', '.yaml'), ...listFiles('observability', '.yaml')]) {
+    const doc = loadYaml(f)
+    if (typeof doc?.contract_version !== 'string') continue
+    declared.push(f)
+    if (doc.contract_version !== PINNED_VERSION) {
+      throw new Error(`${f} declares contract_version ${doc.contract_version}, but this release is ${PINNED_VERSION}`)
+    }
+  }
+  for (const f of openapiFiles) {
+    declared.push(f)
+    const doc = loadYaml(f)
+    if (doc['x-karyalay-contract-version'] && doc['x-karyalay-contract-version'] !== PINNED_VERSION) {
+      throw new Error(`${f} declares x-karyalay-contract-version ${doc['x-karyalay-contract-version']}, expected ${PINNED_VERSION}`)
+    }
+  }
+  if (declared.length < 6) {
+    throw new Error(`only ${declared.length} artifacts declare a version; the release carries at least 6, so this check is inspecting less than it should`)
+  }
+  return `${declared.length} artifacts at ${PINNED_VERSION}`
+})
+
 check('OpenAPI operations reconcile 1:1 with Appendix C', () => {
   const recon = loadYaml('openapi/catalog-reconciliation-v1.yaml')
   if (recon.declared_operation_count !== recon.emitted_operation_count) {
