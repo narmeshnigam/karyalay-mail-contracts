@@ -32,13 +32,16 @@ jobs:
       - name: Lint the OpenAPI documents
         run: npm run lint
 
+      - name: Install gitleaks
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+
       - name: Secret scan
-        # Blocking. The contracts carry public DKIM material and example tokens
-        # by design; a real credential reaching this repository would be
-        # published to every consumer on the next tag.
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The binary rather than gitleaks-action@v2: the action needs a licence key
+        # for organisation accounts and its failure mode is a red build with no
+        # finding, which is indistinguishable from a real leak.
+        run: gitleaks detect --source . --no-banner --redact -v
 
   regeneration-is-clean:
     # A hand-edit to a generated artifact is the failure mode this repository
@@ -52,10 +55,28 @@ jobs:
           path: contracts
 
       - name: Check out the four consumer specifications
+        # The generators transcribe appendices FROM the four repository
+        # specifications, so this repository cannot regenerate without them.
+        #
+        # secrets.GITHUB_TOKEN is scoped to THIS repository only -- it cannot
+        # read the four consumers while they are private. That is why this job
+        # failed on every run before 2026-08-19.
+        #
+        # SPEC_READ_TOKEN is a fine-grained PAT with read access to the four
+        # consumer repositories. Without it this step fails with the message
+        # below rather than a bare clone error, because "you need to add a
+        # secret" and "the network is down" should not look the same.
+        env:
+          SPEC_TOKEN: ${{ secrets.SPEC_READ_TOKEN }}
         run: |
+          if [ -z "$SPEC_TOKEN" ]; then
+            echo "::error::SPEC_READ_TOKEN is not set. The derivation tools read the four consumer repository specifications, which are private, and GITHUB_TOKEN cannot reach another repository."
+            echo "::error::Add a fine-grained PAT with Contents:read on karyalay-mail, karyalay-webmail, karyalay-mail-infra and karyalay-mail-ops as the repository secret SPEC_READ_TOKEN."
+            exit 1
+          fi
           for repo in karyalay-mail karyalay-webmail karyalay-mail-infra karyalay-mail-ops; do
             git clone --depth 1 \
-              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/$repo.git" \
+              "https://x-access-token:${SPEC_TOKEN}@github.com/${{ github.repository_owner }}/$repo.git" \
               "$repo"
           done
 

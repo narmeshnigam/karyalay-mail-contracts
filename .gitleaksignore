@@ -1,0 +1,20 @@
+# gitleaks findings that are false positives, pinned by fingerprint.
+#
+# A fingerprint is commit:path:rule:line. Allowlisting by fingerprint is the
+# narrowest exemption available: it excuses exactly one match and nothing else.
+# A new finding in the same file, on the same rule, still fails the build --
+# the property a path-level or rule-level exclusion throws away.
+#
+# Adding a line here is a review, not a fix. If a real credential ever produces
+# a finding, the answer is to rotate it and rewrite the history, never to append
+# a fingerprint.
+#
+# Note on wording: the descriptions below deliberately do NOT reproduce the text
+# that triggered each rule. Quoting it verbatim makes this file itself a finding,
+# which is how an ignore file starts needing an entry for itself.
+#
+
+# A row of the technology table naming the identity component and what it
+# provides. generic-api-key matches on entropy and cannot tell a sentence
+# from a token. Nothing on the line is a value of any kind.
+2d47129a0b01207da7821e09faf81d28b417d6d9:docs/spec/master-contract-v1.0.md:generic-api-key:422
