@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/events/mailbox.provisioned-v1.schema.json",
+  "title": "mailbox.provisioned v1 payload",
+  "description": "Mailbox current generation observed ready.",
+  "$comment": "Payload for the `data` member of envelope-v1. Fields are the minimum semantic set from karyalay-mail repository-spec-v1.0 Appendix D; exact types are defined here because Appendix D delegates them to the generated schema. Additive optional fields may be introduced within version 1 where old consumers safely ignore them (Master §22.6); consumers ignore unknown additive fields (Repo 1 Appendix D.1), so this schema does not close the object.",
+  "type": "object",
+  "required": [
+    "organisation_id",
+    "domain_id",
+    "mailbox_id",
+    "generation",
+    "cluster_id"
+  ],
+  "properties": {
+    "organisation_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 canonical tenant identifier; Master §6.2 UUID."
+    },
+    "domain_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 canonical hosted-domain identifier."
+    },
+    "mailbox_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 canonical mailbox identifier."
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Desired revision of the resource.",
+      "$comment": "Type source: Master §6.2: every resource participating in reconciliation carries an integer generation."
+    },
+    "cluster_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Logical mail cluster the mailbox was observed ready on.",
+      "$comment": "Type source: Repo 1 Appendix A.14 mailbox_placements.cluster_id VARCHAR(64)."
+    }
+  }
+}

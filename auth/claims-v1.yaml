@@ -1,0 +1,176 @@
+# Karyalay Mail — token claims contract v1
+#
+# HAND-AUTHORED. Unlike permissions-v1.yaml and roles-v1.yaml, no appendix
+# tabulates the claim set; it is assembled from prose and every property below
+# carries the section that fixes it.
+#
+# Sources:
+#   Master §9.2, §9.5, §9.6   browser auth, session model, service identity
+#   Master §6.3               canonical field names
+#   Master §20.7              request correlation
+#   Repo 1 §8.1               TenantContext construction
+#   Repo 1 §17.1              token validation requirements
+#   Repo 1 §18                the five-factor authorization model
+#
+# Filename fixed by Master Contract §0.3. The document is a JSON Schema
+# expressed in YAML so that one file satisfies both the mandated name and the
+# requirement that the claims shape be machine-checkable.
+#
+# WHAT IS DELIBERATELY ABSENT: roles and permissions. Repo 1 §8.1 step 3 loads
+# active membership and effective role assignments from canonical/control
+# projections, and §18 evaluates five factors of which the permission is only
+# one. A role claim in the token would let a stale or forged assertion stand in
+# for that evaluation, so no role or permission claim is defined. See
+# auth/examples/ for one sample token per role, all of which validate against
+# this single schema.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://contracts.karyalay.in/mail/auth/claims-v1.yaml
+title: Karyalay Mail token claims v1
+description: >-
+  The claims Karyalay Email relies on in an OIDC-issued token. Two principal
+  profiles exist and they are never interchangeable: an end-user token from
+  Karyalay identity, and a service-identity workload token. Repo 1 §29.2
+  requires internal endpoints to reject a user access token whose audience or
+  client is wrong, so the profiles are discriminated structurally.
+type: object
+required:
+  - iss
+  - sub
+  - aud
+  - exp
+  - iat
+  - karyalay_principal_type
+unevaluatedProperties: true
+$comment: >-
+  Unknown additive claims are tolerated (Master §20.2); the schema does not
+  close the object. Validation of signature, key rotation and JWKS caching is a
+  runtime concern of Repo 1 §17.1 and is not expressible here.
+properties:
+  iss:
+    type: string
+    format: uri
+    description: Issuer. Validated against the configured Karyalay identity issuer (Repo 1 §17.1).
+  sub:
+    type: string
+    minLength: 1
+    maxLength: 255
+    description: >-
+      Subject. For an end-user token this is the OIDC subject stored as
+      identity_subject (Repo 1 Appendix A.2, VARCHAR(255)). For a service token
+      it is the named service identity (Master §9.6).
+  aud:
+    description: >-
+      Audience. Required, and required to be checked (Repo 1 §17.1). Master §9.6
+      is explicit that a token issued for mail-ops MUST NOT automatically
+      authorize provisioning-admin operations.
+    oneOf:
+      - type: string
+        minLength: 1
+      - type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+  exp:
+    type: integer
+    description: Expiry, seconds since the Unix epoch. Validated (Repo 1 §17.1). Tokens are short-lived (Master §9.2).
+  nbf:
+    type: integer
+    description: Not-before, seconds since the Unix epoch. Validated when present (Repo 1 §17.1).
+  iat:
+    type: integer
+    description: Issued-at, seconds since the Unix epoch.
+  jti:
+    type: string
+    minLength: 1
+    maxLength: 128
+    description: Token identifier. Never overloaded with event_id, request_id, trace_id or an idempotency key (Master §6.2).
+  karyalay_principal_type:
+    type: string
+    enum: [end_user, service_identity]
+    description: >-
+      Which profile the token follows. Named explicitly rather than inferred
+      from audience so that a rejection at an internal boundary (Repo 1 §29.2)
+      is a schema-level outcome, not a heuristic.
+  karyalay_organisation_id:
+    type: string
+    format: uuid
+    description: >-
+      Tenant the token is scoped to (Master §6.3, §7.1). ADVISORY ONLY. Repo 1
+      §8.1 resolves the organisation without trusting a client-supplied value
+      and re-loads membership and role assignments from canonical projections on
+      every request; a present claim narrows the request, it never grants
+      access. No synonym (tenant_id, company_id, account_id) is permitted at a
+      shared boundary (Master §6.3).
+  acr:
+    type: string
+    minLength: 1
+    maxLength: 128
+    description: >-
+      Authentication context class. Sensitive operations — app-password
+      creation, domain transfer, role/elevation changes, DKIM emergency action
+      (Repo 1 §17.1) and the Master §10.4 list — require a sufficient assurance
+      level; the required value is policy, evaluated server-side.
+  amr:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+    description: Authentication methods used. Phishing-resistant authenticators are the preferred stronger method (Master §9.2).
+  auth_time:
+    type: integer
+    description: Time of the original authentication. Backs the "fresh auth" requirement for sensitive actions (Repo 1 §17.1).
+  sid:
+    type: string
+    minLength: 1
+    maxLength: 128
+    description: >-
+      Session identifier. Every interactive session has a unique session ID and
+      revocation state (Master §9.5); the mail-side session projection exists for
+      visibility and revocation UX, and the identity provider remains canonical
+      for primary login sessions (Repo 1 §17.1).
+  azp:
+    type: string
+    minLength: 1
+    description: Authorized party / client identifier.
+  scope:
+    type: string
+    pattern: "^[!#-\\[\\]-~]+( [!#-\\[\\]-~]+)*$"
+    description: Space-delimited scope list (RFC 6749 §3.3).
+allOf:
+  - $comment: >-
+      End-user profile. A browser token from the OIDC Authorization Code + PKCE
+      flow (Master §9.2). It carries no roles; see the header note.
+    if:
+      properties:
+        karyalay_principal_type:
+          const: end_user
+      required: [karyalay_principal_type]
+    then:
+      required: [auth_time]
+      properties:
+        sub:
+          description: OIDC subject of the human identity.
+  - $comment: >-
+      Service-identity profile (Master §9.6). Scopes are mandatory because each
+      internal token MUST state audience and scopes, and Repo 1 §17.2's
+      CREDENTIAL INVARIANT forbids a service credential being usable as an
+      end-user mail credential. A service token is never tenant-scoped by claim;
+      it acts across tenants under an explicit internal contract (Repo 1 §29.2),
+      so karyalay_organisation_id is forbidden here.
+    if:
+      properties:
+        karyalay_principal_type:
+          const: service_identity
+      required: [karyalay_principal_type]
+    then:
+      required: [scope]
+      not:
+        anyOf:
+          - required: [karyalay_organisation_id]
+          - required: [sid]
+          - required: [amr]

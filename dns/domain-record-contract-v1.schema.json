@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/dns/domain-record-contract-v1.schema.json",
+  "title": "Karyalay Mail domain record contract v1",
+  "description": "Shape of dns/domain-record-contract-v1.yaml. Assembled from Master §12/Appendix F, karyalay-mail §10-§11 and karyalay-mail-infra §13/§33/§47.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "contract_version", "sources", "standards", "dmarc_note", "gates", "gate_rules", "observation_status", "health_state", "health_state_mapping", "observation_freshness", "domain_states", "dns_management_modes", "records", "reverse_dns"],
+  "properties": {
+    "contract": { "const": "karyalay-mail-contracts/dns" },
+    "contract_version": { "$ref": "#/$defs/semver" },
+    "sources": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+    "standards": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+    "dmarc_note": { "type": "string", "minLength": 1 },
+    "gates": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate", "proves", "evidence"],
+        "properties": {
+          "gate": { "$ref": "#/$defs/gateName" },
+          "proves": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "gate_rules": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "observation_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "values"],
+      "properties": {
+        "source": { "type": "string" },
+        "values": { "const": ["MATCH", "MISSING", "MISMATCH", "TEMPORARY_ERROR"] }
+      }
+    },
+    "health_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "values"],
+      "properties": {
+        "source": { "type": "string" },
+        "values": { "const": ["PASS", "WARN", "FAIL", "PENDING", "NOT_APPLICABLE"] }
+      }
+    },
+    "health_state_mapping": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Every observation_status value must appear at least once; a resolver outcome with no health mapping would leave a customer with no message to act on.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["observation_status", "health_state"],
+        "properties": {
+          "observation_status": { "enum": ["MATCH", "MISSING", "MISMATCH", "TEMPORARY_ERROR"] },
+          "health_state": { "enum": ["PASS", "WARN", "FAIL", "PENDING", "NOT_APPLICABLE"] },
+          "when": { "type": "string", "minLength": 1 },
+          "note": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "observation_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fields", "rule", "source"],
+      "properties": {
+        "fields": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "rule": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "domain_states": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "values", "readiness_binding"],
+      "properties": {
+        "source": { "type": "string" },
+        "values": {
+          "const": ["REQUESTED", "OWNERSHIP_PENDING", "VERIFIED", "CONFIGURING", "READY_FOR_CUTOVER", "ACTIVE", "SUSPENDED", "DELETION_PENDING", "RELEASED"]
+        },
+        "readiness_binding": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["state", "requires"],
+            "properties": {
+              "state": { "type": "string" },
+              "requires": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "dns_management_modes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "modes", "rule"],
+      "properties": {
+        "source": { "type": "string" },
+        "modes": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["mode", "behaviour"],
+            "properties": {
+              "mode": { "enum": ["customer_managed", "karyalay_managed"] },
+              "behaviour": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "rule": { "type": "string", "minLength": 1 }
+      }
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/record" }
+    },
+    "reverse_dns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applies_to", "publication_owner", "rules", "spec_refs"],
+      "properties": {
+        "applies_to": { "type": "string", "minLength": 1 },
+        "publication_owner": { "$ref": "#/$defs/publicationOwner" },
+        "rules": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "spec_refs": { "$ref": "#/$defs/specRefs" }
+      }
+    }
+  },
+  "$defs": {
+    "semver": { "type": "string", "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$" },
+    "gateName": { "enum": ["ownership", "dns_readiness", "infrastructure", "not_applicable"] },
+    "publicationOwner": {
+      "enum": ["customer", "karyalay"],
+      "description": "Who puts the record in DNS. Independent of who defines it: Karyalay defines every record here, but the customer publishes most of them."
+    },
+    "specRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_kind", "type", "name_pattern", "value_grammar", "ttl_guidance_seconds", "required_for_activation", "verification_rule", "gate", "publication_owner", "spec_refs"],
+      "properties": {
+        "record_kind": {
+          "description": "The Repo 1 Appendix A.7 domain_dns_requirements.record_kind enumeration, plus DANE_TLSA which is published on Karyalay's own MX and never on a customer domain.",
+          "enum": ["VERIFICATION_TXT", "MX", "SPF", "DKIM", "DMARC", "AUTOCONFIG", "AUTODISCOVER", "MTA_STS", "TLS_RPT", "CAA", "DANE_TLSA"]
+        },
+        "type": { "enum": ["TXT", "MX", "CNAME", "A", "AAAA", "CAA", "TLSA", "PTR"] },
+        "name_pattern": { "type": "string", "minLength": 1, "description": "Owner name with {domain}, {selector} or {karyalay_mx_hostname} placeholders." },
+        "value_grammar": { "type": "string", "minLength": 1 },
+        "ttl_guidance_seconds": { "type": "integer", "minimum": 60, "maximum": 86400, "description": "Guidance, not a requirement. A customer's DNS operator sets the actual TTL." },
+        "required_for_activation": { "type": "boolean", "description": "Maps to domain_dns_requirements.required_for_activation (Repo 1 Appendix A.7): whether this record is a hard gate." },
+        "verification_rule": { "type": "string", "minLength": 1, "description": "Required by T00.08: every record type carries one." },
+        "gate": { "$ref": "#/$defs/gateName" },
+        "publication_owner": { "$ref": "#/$defs/publicationOwner" },
+        "customer_domain_record": { "type": "boolean", "default": true },
+        "notes": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "spec_refs": { "$ref": "#/$defs/specRefs" },
+        "token": { "type": "object" },
+        "key_lifecycle": { "type": "object" },
+        "policy_progression": { "type": "object" },
+        "report_handling": { "type": "object" },
+        "companion_records": { "type": "array" },
+        "ordering_rule": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "$comment": "A record that is required for activation must be bound to a gate.",
+          "if": { "properties": { "required_for_activation": { "const": true } }, "required": ["required_for_activation"] },
+          "then": { "properties": { "gate": { "enum": ["ownership", "dns_readiness", "infrastructure"] } } }
+        },
+        {
+          "$comment": "DANE_TLSA is Karyalay-published on Karyalay MX hostnames and must declare itself out of the customer requirement set.",
+          "if": { "properties": { "record_kind": { "const": "DANE_TLSA" } }, "required": ["record_kind"] },
+          "then": {
+            "required": ["customer_domain_record"],
+            "properties": {
+              "customer_domain_record": { "const": false },
+              "publication_owner": { "const": "karyalay" },
+              "required_for_activation": { "const": false }
+            }
+          }
+        },
+        {
+          "$comment": "The DKIM record must carry the key lifecycle, because a DKIM record without rotation semantics is the record most likely to be treated as set-once.",
+          "if": { "properties": { "record_kind": { "const": "DKIM" } }, "required": ["record_kind"] },
+          "then": { "required": ["key_lifecycle"] }
+        },
+        {
+          "$comment": "The verification TXT must carry its token rules.",
+          "if": { "properties": { "record_kind": { "const": "VERIFICATION_TXT" } }, "required": ["record_kind"] },
+          "then": { "required": ["token"] }
+        }
+      ]
+    }
+  }
+}

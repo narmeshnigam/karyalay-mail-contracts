@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/auth/roles-v1.schema.json",
+  "title": "Karyalay Mail role catalog v1",
+  "description": "Shape of auth/roles-v1.yaml. Roles come from Master Contract §10.2/§10.3; default permissions are the inverse index of auth/permissions-v1.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "contract_version", "sources", "rules", "roles"],
+  "properties": {
+    "contract": { "const": "karyalay-mail-contracts/auth/roles" },
+    "contract_version": { "type": "string", "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$" },
+    "sources": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+    "rules": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "scope", "baseline_purpose", "default_permissions"],
+        "properties": {
+          "role": { "$ref": "https://contracts.karyalay.in/mail/auth/permissions-v1.schema.json#/$defs/roleCode" },
+          "scope": {
+            "type": "string",
+            "enum": ["customer", "platform"],
+            "description": "Customer roles are tenant-scoped (Master §10.2). Platform roles are separately governed and audited (Master §7.5)."
+          },
+          "baseline_purpose": { "type": "string", "minLength": 1 },
+          "default_permissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["permission"],
+              "properties": {
+                "permission": { "type": "string", "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$" },
+                "condition": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

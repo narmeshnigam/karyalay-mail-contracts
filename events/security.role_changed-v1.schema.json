@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/events/security.role_changed-v1.schema.json",
+  "title": "security.role_changed v1 payload",
+  "description": "Role assignment changed.",
+  "$comment": "Payload for the `data` member of envelope-v1. Fields are the minimum semantic set from karyalay-mail repository-spec-v1.0 Appendix D; exact types are defined here because Appendix D delegates them to the generated schema. Additive optional fields may be introduced within version 1 where old consumers safely ignore them (Master §22.6); consumers ignore unknown additive fields (Repo 1 Appendix D.1), so this schema does not close the object.",
+  "type": "object",
+  "required": [
+    "organisation_id",
+    "identity_subject",
+    "role_code",
+    "change"
+  ],
+  "properties": {
+    "organisation_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 canonical tenant identifier; Master §6.2 UUID."
+    },
+    "identity_subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "OIDC subject. Not a UUID: Repo 1 Appendix A.2 stores it as VARCHAR(255).",
+      "$comment": "Type source: Repo 1 Appendix A.2/A.3 identity_subject VARCHAR(255)."
+    },
+    "role_code": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Canonical role code from auth/roles-v1.yaml.",
+      "$comment": "Type source: Repo 1 Appendix A.3 role_assignments.role_code VARCHAR(64)."
+    },
+    "change": {
+      "type": "string",
+      "enum": [
+        "GRANTED",
+        "REVOKED"
+      ],
+      "description": "Direction of the role assignment change.",
+      "$comment": "Type source: Repo 1 Appendix A.3 role_assignments lifecycle; Master §22.4 past-tense fact naming."
+    }
+  }
+}

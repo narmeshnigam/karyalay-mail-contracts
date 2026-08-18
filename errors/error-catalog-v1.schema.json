@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/errors/error-catalog-v1.schema.json",
+  "title": "Karyalay Mail error catalog v1",
+  "description": "Shape of errors/error-catalog-v1.yaml. The catalog is a transcription of karyalay-mail repository-spec-v1.0 Appendix E and §39; this schema constrains its form, never its content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "contract_version", "type_uri_template", "sources", "retry_classes", "errors"],
+  "properties": {
+    "contract": { "const": "karyalay-mail-contracts/errors" },
+    "contract_version": { "$ref": "#/$defs/semver" },
+    "type_uri_template": {
+      "description": "RFC 9457 problem type URI template; {code} is the only placeholder (Repo 1 §26.1).",
+      "const": "https://errors.karyalay.in/mail/{code}"
+    },
+    "sources": {
+      "type": "object",
+      "description": "Normative provenance for each part of the catalog.",
+      "additionalProperties": { "type": "string" },
+      "minProperties": 1
+    },
+    "retry_classes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "client_behavior"],
+        "properties": {
+          "name": { "$ref": "#/$defs/retryClass" },
+          "client_behavior": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/error" }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
+    },
+    "code": {
+      "type": "string",
+      "description": "Stable application error identifier (Master §23.1 grouping, Repo 1 Appendix E values).",
+      "pattern": "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$",
+      "minLength": 3,
+      "maxLength": 64
+    },
+    "retryClass": {
+      "type": "string",
+      "description": "Normative automated-client behavior class (Repo 1 §39).",
+      "enum": [
+        "NON_RETRYABLE",
+        "AUTH_REFRESH",
+        "RETRY_AFTER",
+        "RETRYABLE_BACKOFF",
+        "RECONCILIATION_REQUIRED",
+        "OPERATOR_ATTENTION"
+      ]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "http_status", "retry_class", "meaning", "family", "type", "ux_class", "ux_behavior"],
+      "properties": {
+        "code": { "$ref": "#/$defs/code" },
+        "http_status": {
+          "type": "integer",
+          "description": "Default HTTP mapping. An endpoint may reuse the code under a different status only where semantically valid (Appendix E preamble).",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "retry_class": { "$ref": "#/$defs/retryClass" },
+        "meaning": { "type": "string", "minLength": 1 },
+        "family": {
+          "type": "string",
+          "description": "Bounded telemetry label. Derived mechanically as the first underscore-delimited segment of `code`. Repo 1 §40.3 permits error-family labels and forbids unbounded ones; Master §30.4 forbids high-cardinality labels.",
+          "pattern": "^[A-Z][A-Z0-9]*$"
+        },
+        "type": {
+          "type": "string",
+          "format": "uri",
+          "description": "The RFC 9457 `type` value a problem document carries for this code (Repo 1 §26.1).",
+          "pattern": "^https://errors\\.karyalay\\.in/mail/[A-Z0-9_]+$"
+        },
+        "ux_class": {
+          "description": "User-facing category from karyalay-webmail Appendix G. Null where that appendix does not map the code, meaning no browser surface renders it.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "ux_behavior": {
+          "description": "Required client behavior from karyalay-webmail Appendix G. Null exactly when ux_class is null.",
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "ux_class and ux_behavior are present together or absent together.",
+          "if": { "properties": { "ux_class": { "type": "null" } }, "required": ["ux_class"] },
+          "then": { "properties": { "ux_behavior": { "type": "null" } } },
+          "else": { "properties": { "ux_behavior": { "type": "string" } } }
+        },
+        {
+          "$comment": "Repo 1 §39.1: SUBMISSION_STATUS_UNKNOWN is the catalog's only 202 — an ambiguous send outcome is accepted for reconciliation, not a failure.",
+          "if": { "properties": { "code": { "const": "SUBMISSION_STATUS_UNKNOWN" } }, "required": ["code"] },
+          "then": {
+            "properties": {
+              "http_status": { "const": 202 },
+              "retry_class": { "const": "RECONCILIATION_REQUIRED" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

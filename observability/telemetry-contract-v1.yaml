@@ -1,0 +1,244 @@
+# Karyalay Mail — telemetry contract v1
+#
+# HAND-AUTHORED from prose. Filename fixed by Master Contract §0.3.
+#
+# SCOPE RULE (T00.07): only the connective tissue lives here — the correlation
+# identifiers that must survive every hop, the naming and label rules that let
+# four independently built systems produce joinable signals, and the shared
+# status vocabulary. Repo-local metric and alert catalogs stay in their
+# repository specifications and are NOT duplicated here:
+#   Repo 1 Appendix H · Repo 2 Appendix K · Repo 3 §66–§68 · Repo 4 Appendix V
+#
+# Sources: Master §30 (whole), §20.7, §6.2, §6.3, §22.3; Repo 1 §40;
+#          Repo 2 Appendix K/Appendix U; Repo 3 §66–§68; Repo 4 §85/Appendix V.
+
+contract: karyalay-mail-contracts/observability
+contract_version: 0.1.0
+sources:
+  observability_baseline: Karyalay Email Master Architecture & Integration Contract v1.0 §30
+  correlation: "Master §20.7, §6.2, §6.3, §22.3"
+  control_plane_detail: "karyalay-mail repository-spec-v1.0 §40"
+  infrastructure_detail: "karyalay-mail-infra repository-spec-v1.0 §66-§68"
+  browser_detail: karyalay-webmail repository-spec-v1.0 Appendix K
+  operations_detail: "karyalay-mail-ops repository-spec-v1.0 §85, Appendix V"
+  status_terminology: karyalay-webmail repository-spec-v1.0 Appendix U
+
+# --- 1. correlation identifiers -------------------------------------------
+# Master §6.2 is explicit that these are separate concepts and MUST NOT be
+# overloaded. Each row names the one thing the identifier is for.
+correlation_identifiers:
+  - id: trace_id
+    canonical_name: trace_id
+    format: W3C trace context trace-id, 32 lower-case hex characters
+    scope: One distributed trace across every service that can propagate it.
+    source: "Master §30.1, §30.5; Repo 3 §68"
+    survives:
+      - HTTP request (traceparent header)
+      - event envelope (envelope-v1 trace_id)
+      - background job context
+    notes: >-
+      Native SMTP/IMAP daemons do not carry W3C trace context. Master §30.5 and
+      Repo 3 §68 require bounded correlation bridges through queue and resource
+      IDs instead of modifying Internet protocols.
+  - id: request_id
+    canonical_name: request_id
+    format: Opaque string, max 128 characters
+    scope: One inbound HTTP request.
+    source: "Master §6.3, §20.7; Repo 1 §26 (X-Request-ID)"
+    survives:
+      - HTTP request and response (X-Request-ID header)
+      - problem document (`request_id` member)
+      - event envelope (envelope-v1 request_id)
+      - structured log record
+    notes: >-
+      A trusted incoming value may be propagated after validation; an untrusted
+      arbitrary value must not permit log injection or collision abuse
+      (Master §20.7).
+  - id: event_id
+    canonical_name: event_id
+    format: UUIDv7 (RFC 9562)
+    scope: One published event. Also the NATS Nats-Msg-Id and the consumer dedupe key.
+    source: "Master §6.2, §22.3; Repo 1 §31.2"
+  - id: idempotency_key
+    canonical_name: Idempotency-Key
+    format: Opaque client-supplied string, max 128 characters
+    scope: One logical mutation, for replay collapse.
+    source: "Master §20.5, §24.3; Repo 1 §34.1"
+    notes: Never reused as a correlation identifier in telemetry.
+  - id: submission_id
+    canonical_name: submission_id
+    format: UUID
+    scope: One send submission, from API acceptance through the SMTP boundary.
+    source: "Repo 1 §23.1; Repo 3 §68"
+  - id: smtp_queue_id
+    canonical_name: smtp_queue_id
+    format: Postfix queue identifier, opaque
+    scope: The message inside the mail transport, where trace context cannot reach.
+    source: "Master §30.3; Repo 3 §68"
+    notes: The bridge between the control-plane trace and the transport-local record.
+  - id: generation
+    canonical_name: generation
+    format: Monotonic non-negative integer
+    scope: Desired revision of a reconciled resource; how a consumer orders facts.
+    source: "Master §6.2, §22.2; Repo 1 §29.1"
+
+# --- 2. propagation rules --------------------------------------------------
+propagation:
+  http:
+    inbound: >-
+      Every inbound request receives or propagates request_id and W3C trace
+      context (Master §20.7). Repo 1 §26 accepts or generates X-Request-ID and
+      propagates traceparent.
+    outbound_response: Echo the safe request_id in the response and in any problem document (Repo 1 §26).
+    span_naming: Server span per HTTP request named by route template, never the raw URL (Repo 1 §40.2).
+  outbox_to_broker:
+    rule: >-
+      The envelope carries trace_id and request_id across the transactional
+      outbox hop, so the consumer job joins to the originating request without a
+      synchronous link.
+    schema: ../events/envelope-v1.schema.json
+    source: "Master §22.3; Repo 1 §31.1-§31.2"
+  broker_to_job:
+    rule: >-
+      A consumer starts its job span as a child of the envelope trace_id and
+      copies request_id into its log context. Redelivery of the same event_id
+      MUST NOT start a second logical unit of work (Master §22.2).
+  mail_transport:
+    rule: >-
+      Trace context stops at the SMTP boundary. submission_id and smtp_queue_id
+      are recorded together at acceptance, which is what makes an end-to-end
+      trace reconstructable (Master §30.3).
+
+# --- 3. structured log baseline -------------------------------------------
+# The common subset every repository emits. Repositories add fields; none
+# renames or omits a field below.
+log_record:
+  schema: log-record-v1.schema.json
+  format: JSON lines or an equivalent structured event envelope
+  timestamp: RFC 3339 UTC, high resolution where useful
+  required_fields: [timestamp, severity, service, environment, event]
+  conditional_fields:
+    - field: request_id
+      when: The record belongs to an HTTP request.
+    - field: trace_id
+      when: A trace context exists.
+    - field: organisation_id
+      when: The tenant is already known and disclosure is permitted.
+    - field: error_code
+      when: The record reports a failure. Value comes from errors/error-catalog-v1.yaml.
+  omission_rule: Fields are omitted when not applicable, never emitted empty or null as a placeholder (Master §30.2).
+  prose_rule: Essential fields are structured values, never concatenated into an unparseable message string (Master §30.2).
+
+# --- 4. redaction ----------------------------------------------------------
+# Master §28/§30, Repo 1 §38.2, Repo 3 §66. Absolute; no severity or debug
+# level relaxes it.
+redaction:
+  never_logged:
+    - passwords and password verifiers
+    - OAuth tokens, bearer tokens and authorization headers
+    - app passwords
+    - DKIM and PKI private keys
+    - full message bodies and attachment bytes
+    - search queries
+    - recipient lists beyond documented aggregate needs
+  never_in_spans:
+    source: "Repo 1 §40.2"
+    values:
+      - message subject or body
+      - recipient list
+      - search query
+      - tokens and secrets
+  minimised:
+    - field: Message-ID
+      rule: May be hashed or minimised where the full value is not needed (Repo 3 §66).
+    - field: email address
+      rule: Classified data. Included only where semantically required, with restricted consumer access (Repo 1 §31.3).
+  verbose_debug:
+    rule: >-
+      Protocol-level verbose logging is temporary, scoped to a mailbox or peer
+      where possible, time-bounded and access-controlled (Repo 3 §66).
+
+# --- 5. metric naming and cardinality -------------------------------------
+metrics:
+  cardinality_invariant: >-
+    METRICS INVARIANT (Repo 1 §40.3, Master §30.4, Repo 3 §67): metrics SHALL
+    NOT be labelled by organisation_id, mailbox_id, email address, domain,
+    Message-ID, IP address, request_id, trace_id or arbitrary error text. Use
+    bounded labels only — route template, operation, status class, dependency,
+    and job/event/error family. Detailed dimensions belong in structured logs.
+  naming:
+    - rule: A Karyalay-authored metric carries its producing repository's prefix.
+      prefixes:
+        karyalay-mail: mail_
+        karyalay-mail-infra: infra_
+        karyalay-mail-ops: ops_
+      rationale: >-
+        Four repositories scrape into one system. Without a prefix, two
+        repositories can define the same metric name with different meanings and
+        the collision is invisible until a dashboard silently mixes them.
+    - rule: >-
+        Third-party exporter metrics keep their upstream names — postfix_*,
+        dovecot_*, rspamd_*, node_* and so on. They are never renamed to fit the
+        prefix rule, because renaming breaks every upstream dashboard and alert
+        rule written against them.
+    - rule: Units are explicit in the name — _seconds, _bytes, _total — per Master §20.2.
+    - rule: >-
+        karyalay-webmail publishes browser telemetry events (dotted lower-case
+        names, Repo 2 Appendix K), not Prometheus metrics, and is out of scope
+        for the prefix rule.
+  bounded_label_values:
+    error_family: The `family` member of errors/error-catalog-v1.yaml. Bounded by construction.
+    event_family: The `family` member of events/catalog-v1.yaml.
+    status_class: One of 2xx, 3xx, 4xx, 5xx.
+    resource_type: The provisioning resource enumeration (Repo 1 Appendix A.31).
+
+# --- 6. alert quality ------------------------------------------------------
+alerts:
+  source: "Master §30.6; Repo 3 §67"
+  required_attributes:
+    - owner or team
+    - severity
+    - user or business impact statement
+    - primary dashboard or query
+    - first diagnostic steps or runbook link
+    - dedup/silence (grouping) key
+    - escalation path
+    - auto-resolve condition
+  rules:
+    - Prefer symptom alerts over noisy internal metrics.
+    - Page on user-impacting or imminent-data-risk conditions, not every transient retry.
+    - Repeated non-actionable alerts are engineering defects, not tuning problems.
+    - >-
+      At least one monitoring path operates outside the primary production
+      failure domain, so a total outage still pages (Master §30.7, Repo 3 §69).
+
+# --- 7. shared status vocabulary ------------------------------------------
+# Master requires joinable signals; that needs one word per state across four
+# repositories. Outcome and severity below are the shared machine vocabulary.
+# User-facing wording is separate and belongs to Repo 2 Appendix U — the two
+# must not be conflated: `outcome: failure` is a log value, "Couldn't send" is a
+# sentence shown to a person.
+status_vocabulary:
+  severity:
+    values: [DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL]
+    source: "Master §30.2; syslog severity naming"
+  outcome:
+    values: [success, failure, rejected, timeout, cancelled, unknown]
+    source: "Repo 1 §40.1 outcome field; Repo 1 §33.6 submission states"
+    rules:
+      - >-
+        `unknown` is a real terminal value, not a missing one. Repo 1 §39.1 and
+        the SUBMISSION_STATUS_UNKNOWN code require an ambiguous send outcome to
+        be recorded as ambiguous and reconciled, never guessed either way.
+  observed_resource_status:
+    values: [READY, DEGRADED, FAILED, ABSENT]
+    source: karyalay-mail repository-spec-v1.0 Appendix A.32
+  user_facing_terminology:
+    owner: karyalay-webmail repository-spec-v1.0 Appendix U
+    rule: >-
+      Not duplicated here. Repo 2 Appendix U is the single source for the words
+      shown to a person; this contract governs only the machine vocabulary that
+      those words are derived from.
+
+# --- 8. walkthrough --------------------------------------------------------
+correlation_walkthrough: correlation-walkthrough.md

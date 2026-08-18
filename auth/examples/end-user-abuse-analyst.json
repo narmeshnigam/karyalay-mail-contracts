@@ -1,0 +1,19 @@
+{
+  "iss": "https://identity.karyalay.in",
+  "sub": "972aaa16-7bbd-7aa4-83a6-97f40fcba390",
+  "aud": "karyalay-mail-api",
+  "exp": 1787012100,
+  "nbf": 1787011200,
+  "iat": 1787011200,
+  "jti": "79be30a3-a04e-705b-99db-995db5ae81fc",
+  "karyalay_principal_type": "end_user",
+  "acr": "urn:karyalay:acr:mfa",
+  "amr": [
+    "pwd",
+    "hwk"
+  ],
+  "auth_time": 1787011140,
+  "sid": "736433f2-c6b1-79cb-a6e9-883f86e9a87e",
+  "azp": "karyalay-webmail",
+  "scope": "openid profile email"
+}

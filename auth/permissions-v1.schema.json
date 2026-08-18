@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/auth/permissions-v1.schema.json",
+  "title": "Karyalay Mail permission catalog v1",
+  "description": "Shape of auth/permissions-v1.yaml, a transcription of karyalay-mail repository-spec-v1.0 Appendix B and B.1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "contract_version", "sources", "authorization_model", "break_glass", "object_relations", "permissions"],
+  "properties": {
+    "contract": { "const": "karyalay-mail-contracts/auth/permissions" },
+    "contract_version": { "$ref": "#/$defs/semver" },
+    "sources": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+    "authorization_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "source", "rules"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "rules": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "break_glass": {
+      "type": "object",
+      "description": "A reference to §18.1 semantics, not a mechanism definition (T00.03).",
+      "additionalProperties": false,
+      "required": ["permission", "semantics_reference", "note"],
+      "properties": {
+        "permission": { "const": "platform.break_glass" },
+        "semantics_reference": { "type": "string", "minLength": 1 },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "object_relations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resource", "relation_requirement"],
+        "properties": {
+          "resource": { "type": "string", "minLength": 1 },
+          "relation_requirement": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["permission", "meaning", "default_role_bundles", "source_text"],
+        "properties": {
+          "permission": {
+            "type": "string",
+            "description": "resource.action naming (Master Appendix B.1).",
+            "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+            "maxLength": 64
+          },
+          "meaning": { "type": "string", "minLength": 1 },
+          "default_role_bundles": {
+            "type": "array",
+            "description": "Seed/policy guidance only. Never a substitute for a role-name check, which Repo 1 §18 forbids outright.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["role"],
+              "properties": {
+                "role": { "$ref": "#/$defs/roleCode" },
+                "condition": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Qualifier carried verbatim from the appendix cell, e.g. \"metadata only\", \"own\"."
+                }
+              }
+            }
+          },
+          "source_text": {
+            "type": "string",
+            "description": "The appendix cell exactly as written, so a reviewer can check the split without opening the specification.",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Fragments of the appendix cell that name a policy path rather than a role."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": { "type": "string", "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$" },
+    "roleCode": {
+      "type": "string",
+      "description": "A role from the Master Contract §10.2/§10.3 catalog. Kept closed: a repository may not add a role at a shared boundary.",
+      "enum": [
+        "org_owner", "mail_admin", "helpdesk_admin", "security_admin",
+        "billing_admin", "auditor", "mailbox_user",
+        "platform_ops", "platform_support", "platform_security",
+        "abuse_analyst", "deliverability_analyst", "platform_billing",
+        "break_glass_admin"
+      ]
+    }
+  }
+}

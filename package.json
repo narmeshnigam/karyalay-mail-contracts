@@ -1,0 +1,26 @@
+{
+  "name": "karyalay-mail-contracts",
+  "version": "0.1.0",
+  "description": "Shared contract authority for Karyalay Email. Toolchain only; the contracts themselves are language-neutral files.",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "derive": "python3 tools/derive/gen_errors.py && python3 tools/derive/gen_events.py && python3 tools/derive/gen_auth.py && python3 tools/derive/gen_openapi.py",
+    "validate": "node tools/validate/validate.mjs",
+    "lint": "redocly lint",
+    "check": "npm run validate && npm run lint"
+  },
+  "license": "LicenseRef-Karyalay-Proprietary",
+  "type": "module",
+  "devDependencies": {
+    "@redocly/cli": "^1.25.15",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.6.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/events/envelope-v1.schema.json",
+  "title": "Karyalay Mail event envelope v1",
+  "description": "The shared envelope every Karyalay event carries, transcribed from Master Contract §22.3. No repository redefines it. `data` is constrained by the per-event payload schema named in events/catalog-v1.yaml; this schema deliberately leaves it open so the envelope can be validated independently of any one event.",
+  "$comment": "Consumer semantics (Master §22.2, Repo 1 §31.2): delivery is at-least-once and the same event_id may be redelivered after a broker acknowledgement that the producer failed to record. Handlers MUST be idempotent on event_id. Ordering is guaranteed only where documented for a resource; compare resource.generation when order matters. Poison events go to dead-letter with alerting, never silent deletion.",
+  "type": "object",
+  "required": [
+    "event",
+    "version",
+    "event_id",
+    "occurred_at",
+    "producer",
+    "resource",
+    "data"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event": {
+      "type": "string",
+      "description": "Lower-case dotted past-tense fact name (Master §22.4). Command-style names are not events.",
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+      "maxLength": 96
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Event schema major version. An unknown version is routed to a compatibility error/alert, never parsed as an older version (Repo 1 Appendix D.1)."
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUIDv7 (RFC 9562, Master §6.2). Also the NATS Nats-Msg-Id and the consumer deduplication key. Never overloaded with request_id, trace_id or an idempotency key (Master §6.2)."
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 UTC instant the fact was committed (Master §20.2)."
+    },
+    "producer": {
+      "type": "string",
+      "description": "Repository/service that committed the fact.",
+      "enum": [
+        "karyalay-mail",
+        "karyalay-mail-infra",
+        "karyalay-mail-ops"
+      ]
+    },
+    "trace_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "W3C trace context trace-id carried across the outbox hop (Master §30.1, §20.7).",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "request_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Correlation ID of the request that caused the fact (Master §6.3, §20.7). Null for scheduler-originated facts.",
+      "maxLength": 128
+    },
+    "organisation_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Tenant the fact belongs to (Master §6.3). Null only for security/platform events that belong to no customer (Master §22.3)."
+    },
+    "resource": {
+      "type": "object",
+      "description": "The aggregate the fact is about (Master §22.3).",
+      "required": [
+        "type",
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "maxLength": 32,
+          "description": "Canonical entity name (Master Appendix A / §6.1)."
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Desired revision of the resource (Master §6.2). Present for every resource that participates in reconciliation; null for those that do not. Consumers compare it when ordering matters (Master §22.2)."
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "description": "Event payload. MUST NOT carry message bodies, attachment contents, passwords, app-password secrets or private cryptographic keys (Master §22.5, Repo 1 §31.3)."
+    }
+  }
+}

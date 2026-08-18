@@ -1,0 +1,59 @@
+# OpenAPI lint configuration — T00.09.
+#
+# The ruleset is deliberately strict on the things Master §20 and Repo 1 §26
+# make normative, and silent on style preferences that no specification fixes.
+# A rule here that no contract requires is a rule that will eventually be
+# switched off under deadline; only rules with a citation earn a place.
+
+apis:
+  public-control:
+    root: openapi/public-control-api-v1.yaml
+  mailbox:
+    root: openapi/mailbox-api-v1.yaml
+  internal-provisioning:
+    root: openapi/internal-provisioning-api-v1.yaml
+  operations:
+    root: openapi/operations-api-v1.yaml
+
+extends:
+  - recommended
+
+rules:
+  # --- structural correctness -------------------------------------------
+  struct: error
+  no-unresolved-refs: error
+  spec-strict-refs: off
+
+  # --- Repo 1 §26.2 / Master §20.10: the document is the contract --------
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-summary: error
+  operation-description: error
+  no-ambiguous-paths: error
+  path-not-include-query: error
+  no-identical-paths: error
+  operation-2xx-response: error
+  operation-4xx-response: error
+
+  # --- Master §20.8: 401 and 403 are distinct and both documented -------
+  operation-4xx-problem-details-rfc7807: error
+
+  # --- naming: Master §20.2 snake_case ----------------------------------
+  path-segment-plural: off
+  paths-kebab-case: off
+  spec-components-invalid-map-name: error
+
+  # --- noise we deliberately accept -------------------------------------
+  # Tags are grouped by resource family, not per operation-id prefix.
+  operation-tag-defined: error
+  tags-alphabetical: off
+  # Every operation inherits the document-level security requirement; only
+  # the unauthenticated health probes override it (C.105 notes).
+  security-defined: error
+  # info.license is set; contact is a team address that does not exist yet
+  # and inventing one would be worse than omitting it.
+  info-contact: off
+  info-license: error
+  # Examples are executable contract fixtures (Repo 1 §26.2) and live in
+  # auth/examples and the harness, not inline in the documents.
+  no-invalid-media-type-examples: error

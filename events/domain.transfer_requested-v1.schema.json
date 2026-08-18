@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/events/domain.transfer_requested-v1.schema.json",
+  "title": "domain.transfer_requested v1 payload",
+  "description": "Controlled tenant transfer requested.",
+  "$comment": "Payload for the `data` member of envelope-v1. Fields are the minimum semantic set from karyalay-mail repository-spec-v1.0 Appendix D; exact types are defined here because Appendix D delegates them to the generated schema. Additive optional fields may be introduced within version 1 where old consumers safely ignore them (Master §22.6); consumers ignore unknown additive fields (Repo 1 Appendix D.1), so this schema does not close the object.",
+  "type": "object",
+  "required": [
+    "domain_id",
+    "from_organisation_id",
+    "to_organisation_id",
+    "transfer_id"
+  ],
+  "properties": {
+    "domain_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 canonical hosted-domain identifier."
+    },
+    "from_organisation_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 organisation_id, qualified by transfer direction (Repo 1 §10.4)."
+    },
+    "to_organisation_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 organisation_id, qualified by transfer direction (Repo 1 §10.4)."
+    },
+    "transfer_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Repo 1 Appendix A.43 domain_transfer_operations.id BINARY(16)."
+    }
+  }
+}

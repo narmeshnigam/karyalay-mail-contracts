@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/events/group.updated-v1.schema.json",
+  "title": "group.updated v1 payload",
+  "description": "Distribution group changed.",
+  "$comment": "Payload for the `data` member of envelope-v1. Fields are the minimum semantic set from karyalay-mail repository-spec-v1.0 Appendix D; exact types are defined here because Appendix D delegates them to the generated schema. Additive optional fields may be introduced within version 1 where old consumers safely ignore them (Master §22.6); consumers ignore unknown additive fields (Repo 1 Appendix D.1), so this schema does not close the object.",
+  "type": "object",
+  "required": [
+    "organisation_id",
+    "group_id",
+    "changed_fields"
+  ],
+  "properties": {
+    "organisation_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 canonical tenant identifier; Master §6.2 UUID."
+    },
+    "group_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Repo 1 Appendix A.22 distribution_groups.id BINARY(16)."
+    },
+    "changed_fields": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "maxLength": 64
+      },
+      "description": "Names of the fields that changed. Names only — values are not carried (Master §22.5).",
+      "$comment": "Type source: Master §22.5 data minimisation; Repo 1 §31.3 event privacy."
+    }
+  }
+}

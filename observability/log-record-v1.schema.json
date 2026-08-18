@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/observability/log-record-v1.schema.json",
+  "title": "Karyalay structured log record v1",
+  "description": "The shared subset of every Karyalay-authored structured log record. Repositories add fields; none renames or omits one defined here. Transcribed from Master §30.2, karyalay-mail §40.1 and karyalay-mail-infra §66.",
+  "$comment": "Open by design: repo-local fields are expected and are not a validation failure. What this schema enforces is that the joinable fields are present, correctly typed, and that forbidden fields are absent.",
+  "type": "object",
+  "required": ["timestamp", "severity", "service", "environment", "event"],
+  "properties": {
+    "timestamp": { "type": "string", "format": "date-time", "description": "RFC 3339 UTC, high resolution where useful." },
+    "severity": { "type": "string", "enum": ["DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"] },
+    "service": { "type": "string", "minLength": 1, "maxLength": 64, "description": "Emitting service, e.g. karyalay-mail, mail-control, infra-controller." },
+    "process_role": { "type": "string", "minLength": 1, "maxLength": 64, "description": "Role within the service (Repo 1 §40.1), e.g. mail-api, mail-outbox." },
+    "node": { "type": "string", "minLength": 1, "maxLength": 128, "description": "Host or node identity (Repo 3 §66)." },
+    "environment": { "type": "string", "enum": ["development", "test", "staging", "production"] },
+    "version": { "type": "string", "maxLength": 64, "description": "Release/config generation, so behaviour ties to deployed state (Repo 3 §66)." },
+    "event": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$", "maxLength": 96, "description": "Dotted event name, e.g. mailbox.create.committed." },
+    "request_id": { "type": "string", "maxLength": 128 },
+    "trace_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "span_id": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "organisation_id": { "type": "string", "format": "uuid", "description": "Present only when the tenant is already known and disclosure is permitted (Repo 3 §66)." },
+    "domain_id": { "type": "string", "format": "uuid" },
+    "mailbox_id": { "type": "string", "format": "uuid" },
+    "resource_type": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 32 },
+    "resource_id": { "type": "string", "maxLength": 64 },
+    "submission_id": { "type": "string", "format": "uuid" },
+    "smtp_queue_id": { "type": "string", "maxLength": 64 },
+    "outcome": { "type": "string", "enum": ["success", "failure", "rejected", "timeout", "cancelled", "unknown"] },
+    "error_code": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$",
+      "maxLength": 64,
+      "description": "A code from errors/error-catalog-v1.yaml. Null on success paths that carry the field."
+    },
+    "duration_ms": { "type": "number", "minimum": 0 },
+    "message": { "type": "string", "maxLength": 2048, "description": "Sanitized operator-safe description. Never the carrier of an essential structured field." }
+  },
+  "not": {
+    "$comment": "Master §30 and Repo 1 §38.2/§40.2 forbid these outright. Named here so a validator catches the mistake rather than a privacy review months later.",
+    "anyOf": [
+      { "required": ["password"] },
+      { "required": ["token"] },
+      { "required": ["access_token"] },
+      { "required": ["authorization"] },
+      { "required": ["app_password"] },
+      { "required": ["private_key"] },
+      { "required": ["dkim_private_key"] },
+      { "required": ["message_body"] },
+      { "required": ["body"] },
+      { "required": ["subject"] },
+      { "required": ["attachment"] },
+      { "required": ["search_query"] },
+      { "required": ["recipients"] }
+    ]
+  }
+}

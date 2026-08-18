@@ -1,0 +1,11 @@
+{
+  "iss": "https://identity.karyalay.in",
+  "sub": "svc:karyalay-mail-infra-controller",
+  "aud": "karyalay-mail-internal",
+  "exp": 1787011500,
+  "nbf": 1787011200,
+  "iat": 1787011200,
+  "jti": "9b0387f0-1503-7acc-9524-5c59ac3388b9",
+  "karyalay_principal_type": "service_identity",
+  "scope": "provisioning.observe provisioning.report"
+}

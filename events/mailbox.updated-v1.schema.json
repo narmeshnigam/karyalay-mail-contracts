@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/events/mailbox.updated-v1.schema.json",
+  "title": "mailbox.updated v1 payload",
+  "description": "Mailbox mutable configuration changed.",
+  "$comment": "Payload for the `data` member of envelope-v1. Fields are the minimum semantic set from karyalay-mail repository-spec-v1.0 Appendix D; exact types are defined here because Appendix D delegates them to the generated schema. Additive optional fields may be introduced within version 1 where old consumers safely ignore them (Master §22.6); consumers ignore unknown additive fields (Repo 1 Appendix D.1), so this schema does not close the object.",
+  "type": "object",
+  "required": [
+    "organisation_id",
+    "mailbox_id",
+    "changed_fields",
+    "generation"
+  ],
+  "properties": {
+    "organisation_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 canonical tenant identifier; Master §6.2 UUID."
+    },
+    "mailbox_id": {
+      "type": "string",
+      "format": "uuid",
+      "$comment": "Type source: Master §6.3 canonical mailbox identifier."
+    },
+    "changed_fields": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "maxLength": 64
+      },
+      "description": "Names of the fields that changed. Names only — values are not carried (Master §22.5).",
+      "$comment": "Type source: Master §22.5 data minimisation; Repo 1 §31.3 event privacy."
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Desired revision of the resource.",
+      "$comment": "Type source: Master §6.2: every resource participating in reconciliation carries an integer generation."
+    }
+  }
+}

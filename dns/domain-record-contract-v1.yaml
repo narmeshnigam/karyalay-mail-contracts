@@ -1,0 +1,426 @@
+# Karyalay Mail — domain record contract v1
+#
+# HAND-AUTHORED from prose. Filename fixed by Master Contract §0.3.
+#
+# The shared vocabulary behind four surfaces that must agree: Repo 1's
+# DNS-readiness state machine, Repo 3's authoritative zone generation and
+# transport-security publication, Repo 2's readiness display, and Repo 4's
+# deliverability workflows.
+#
+# Sources:
+#   Master §12 (whole), Appendix F      onboarding, ownership, record contract
+#   Repo 1 §10, §11, Appendix A.6–A.8   requirement/observation model, DKIM lifecycle
+#   Repo 1 Appendix F.2, F.3            domain and DKIM key state machines
+#   Repo 3 §13, §33, §45, §47           service names, DANE/MTA-STS/TLS-RPT, DNSSEC
+#
+# SCOPE: records for a CUSTOMER domain. Karyalay's own service zone
+# (mx1.mail.karyalay.in and siblings, Repo 3 §13) is Repo 3's to publish and is
+# referenced here only as the target of customer records.
+
+contract: karyalay-mail-contracts/dns
+contract_version: 0.1.0
+sources:
+  onboarding: Karyalay Email Master Architecture & Integration Contract v1.0 §12
+  naming_baseline: Karyalay Email Master Architecture & Integration Contract v1.0 Appendix F
+  requirement_model: "karyalay-mail repository-spec-v1.0 §10, Appendix A.7"
+  observation_model: karyalay-mail repository-spec-v1.0 Appendix A.8
+  dkim_lifecycle: "karyalay-mail repository-spec-v1.0 §11, Appendix F.3"
+  transport_security: "karyalay-mail-infra repository-spec-v1.0 §33, §47"
+  service_names: "karyalay-mail-infra repository-spec-v1.0 §13"
+
+standards:
+  SPF: RFC 7208
+  DKIM: RFC 6376
+  DMARC: RFC 9989 (May 2026; obsoletes RFC 7489 and RFC 9091)
+  DANE_SMTP: RFC 7672
+  MTA_STS: RFC 8461
+  TLS_RPT: RFC 8460
+  CAA: RFC 8659
+  IDNA: RFC 5891
+  UUID: RFC 9562
+dmarc_note: >-
+  Every DMARC surface in this programme targets RFC 9989, not RFC 7489. Repo 3
+  §31 states that obsolete RFC 7489 text is not normative and that receiver
+  compatibility quirks are documented separately and MUST NOT weaken core
+  alignment semantics without an ADR. No specification is edited by this
+  contract; the citation is recorded so a consumer cannot pick the wrong one.
+
+# --- the three gates ------------------------------------------------------
+# Repo 1 §10 opens by insisting these are separate. Collapsing any two of them
+# is the failure mode this section exists to prevent.
+gates:
+  - gate: ownership
+    proves: The organisation controls the domain.
+    evidence: A fresh, valid, unexpired verification TXT observation.
+  - gate: dns_readiness
+    proves: Mail routing and authentication are configured.
+    evidence: Every record with required_for_activation true observed MATCH on a fresh snapshot.
+  - gate: infrastructure
+    proves: Karyalay can actually serve the domain.
+    evidence: "observed_generation equals desired_generation with fresh READY sub-observations (Repo 1 §29.1)."
+gate_rules:
+  - >-
+    A domain MUST NOT become ACTIVE merely because the ownership TXT exists
+    (Master §12.1). All three gates are evaluated.
+  - >-
+    Activation evaluates a FRESH requirement snapshot, never an old successful
+    check (Repo 1 §10.3).
+  - >-
+    A temporary DNS resolution failure is not equivalent to a missing record
+    (Repo 1 §10.3). TEMPORARY_ERROR and MISSING are distinct observation states
+    and must not be merged.
+  - >-
+    A single green "DNS configured" boolean is insufficient (Master §12.4).
+    Every record carries its own status, observed value, expected value,
+    resolver timestamp and remediation guidance.
+
+# --- observation and health states ---------------------------------------
+# Two vocabularies exist in the sources and both are real: Repo 1 records what
+# the resolver saw, Master §12.4 describes what the customer is shown. They are
+# related by the mapping below, not by renaming either one.
+observation_status:
+  source: karyalay-mail repository-spec-v1.0 Appendix A.8
+  values: [MATCH, MISSING, MISMATCH, TEMPORARY_ERROR]
+health_state:
+  source: "Karyalay Email Master Architecture & Integration Contract v1.0 §12.4"
+  values: [PASS, WARN, FAIL, PENDING, NOT_APPLICABLE]
+health_state_mapping:
+  - observation_status: MATCH
+    health_state: PASS
+  - observation_status: MISSING
+    health_state: FAIL
+    when: required_for_activation is true
+  - observation_status: MISSING
+    health_state: WARN
+    when: required_for_activation is false and the record is recommended for this domain
+  - observation_status: MISSING
+    health_state: NOT_APPLICABLE
+    when: the record is not part of this domain's requirement set
+  - observation_status: MISMATCH
+    health_state: FAIL
+  - observation_status: TEMPORARY_ERROR
+    health_state: PENDING
+    note: >-
+      PENDING, never FAIL. Repo 1 §10.3 forbids treating a resolver failure as a
+      missing record, and a customer told their correct record is wrong will
+      change it.
+observation_freshness:
+  fields: [checked_at, expires_at]
+  rule: >-
+    An observation past expires_at is stale and cannot satisfy a gate. Staleness
+    is not failure — it is absence of evidence, and the check is re-run.
+  source: "karyalay-mail repository-spec-v1.0 §10.3, Appendix A.8"
+
+# --- domain lifecycle -----------------------------------------------------
+domain_states:
+  source: "karyalay-mail repository-spec-v1.0 Appendix F.2; Master §12.1"
+  values:
+    - REQUESTED
+    - OWNERSHIP_PENDING
+    - VERIFIED
+    - CONFIGURING
+    - READY_FOR_CUTOVER
+    - ACTIVE
+    - SUSPENDED
+    - DELETION_PENDING
+    - RELEASED
+  readiness_binding:
+    - state: OWNERSHIP_PENDING
+      requires: Canonical reservation succeeded and a challenge was issued.
+    - state: VERIFIED
+      requires: Authoritative DNS TXT challenge observed valid.
+    - state: CONFIGURING
+      requires: DKIM/DNS/infra desired generation dispatched.
+    - state: READY_FOR_CUTOVER
+      requires: All three gates satisfied on fresh observations.
+    - state: ACTIVE
+      requires: An explicit authorized activation transition. Never automatic.
+dns_management_modes:
+  source: "Karyalay Email Master Architecture & Integration Contract v1.0 §12.7"
+  modes:
+    - mode: customer_managed
+      behaviour: Display the exact required records, verify them, never assume immediate propagation.
+    - mode: karyalay_managed
+      behaviour: The control plane creates and rotates records through an internal DNS API against Repo 3's authoritative zone.
+  rule: The DomainRecordRequirement model is identical in both modes (Master §12.7).
+
+# --- the record set -------------------------------------------------------
+# record_kind values are the enumeration of Repo 1 Appendix A.7
+# domain_dns_requirements.record_kind, plus DANE_TLSA which Repo 3 §33
+# publishes on Karyalay's own MX and which therefore never appears in a
+# customer requirement set (see its publication_owner).
+records:
+  - record_kind: VERIFICATION_TXT
+    type: TXT
+    name_pattern: _karyalay-verification.{domain}
+    value_grammar: karyalay-domain-verification={token}
+    token:
+      entropy_bits_min: 128
+      encoding: base32 lower-case, unpadded
+      storage: >-
+        Only a hash is stored (Repo 1 Appendix A.6 token_hash). The raw token is
+        shown once, at challenge creation.
+      scope: One domain and one organisation. Never accepted for a different domain (Master §12.2).
+      lifecycle: >-
+        Expires or is rotated; revalidated during sensitive domain transfer flows;
+        invalidated after domain release or transfer (Master §12.2, Appendix F.4).
+      not_a_credential: >-
+        The token grants no mailbox access and is not an authentication
+        credential (Master §12.2, Appendix F.4).
+    ttl_guidance_seconds: 300
+    required_for_activation: true
+    verification_rule: >-
+      Query authoritative nameservers for the TXT set at the owner name; the
+      challenge is satisfied when one record's token hashes to the stored
+      token_hash and expires_at is in the future. Never marked verified from
+      client input (Repo 1 §10.1 step 4).
+    gate: ownership
+    publication_owner: customer
+    spec_refs: ["Master §12.2, Appendix F.4", "Repo 1 §10.1, Appendix A.6"]
+
+  - record_kind: MX
+    type: MX
+    name_pattern: "{domain}"
+    value_grammar: "{preference} {karyalay_mx_target}."
+    ttl_guidance_seconds: 3600
+    required_for_activation: true
+    verification_rule: >-
+      Every MX target resolves to a production-certified Karyalay MX name
+      (Repo 3 §13) and no non-Karyalay target remains for a domain being
+      activated. At least two independent targets are expected.
+    gate: dns_readiness
+    publication_owner: customer
+    notes:
+      - Customer MX records point only to production-certified Karyalay MX names (Repo 3 §13).
+      - >-
+        MX targets are MX-specific hostnames, never a vanity webmail hostname
+        that may move independently (Master Appendix F.1).
+      - >-
+        Site or rack changes MUST NOT require a customer MX change unless the
+        public service identity itself changes (Repo 3 §13).
+    spec_refs: ["Master §12.3", "Repo 1 §10.2", "Repo 3 §13"]
+
+  - record_kind: SPF
+    type: TXT
+    name_pattern: "{domain}"
+    value_grammar: v=spf1 include:{karyalay_spf_include} ~all
+    ttl_guidance_seconds: 3600
+    required_for_activation: true
+    verification_rule: >-
+      Exactly one v=spf1 record exists at the apex; it includes the stable
+      Karyalay include domain; the total DNS-lookup count stays within RFC 7208
+      limits. More than one SPF record is a permanent error under RFC 7208, so
+      two records observed is MISMATCH, not MATCH.
+    gate: dns_readiness
+    publication_owner: customer
+    notes:
+      - >-
+        A stable Karyalay include domain is maintained so outbound IP changes do
+        not require editing every customer domain (Master §12.5).
+      - The include tree stays below practical lookup limits and is not deeply nested (Master §12.5).
+      - >-
+        SPF is NOT authorization to send arbitrary From addresses. Sender
+        authorization is enforced by the submission/control plane (Master §12.5).
+    spec_refs: ["Master §12.3, §12.5", "Repo 1 §10.2"]
+
+  - record_kind: DKIM
+    type: TXT
+    name_pattern: "{selector}._domainkey.{domain}"
+    value_grammar: v=DKIM1; k={key_type}; p={base64_public_key}
+    ttl_guidance_seconds: 3600
+    required_for_activation: true
+    verification_rule: >-
+      The record at the ACTIVE selector's owner name parses as a DKIM key record
+      and its p= value equals the public key Infra returned for that key
+      reference. During overlap, the outgoing selector's record must also still
+      resolve.
+    gate: dns_readiness
+    publication_owner: customer
+    key_lifecycle:
+      states: [PLANNED, PUBLISHED_PENDING, ACTIVE, ROTATING_OUT, RETIRED, REVOKED]
+      source: karyalay-mail repository-spec-v1.0 Appendix F.3
+      rules:
+        - Selectors are non-secret bounded DNS labels with lifecycle metadata (Master Appendix F.3).
+        - Rotation naming avoids collisions and allows at least two overlapping published generations (Master Appendix F.3).
+        - >-
+          Activation waits for a FRESH observation of the new public key AND
+          signer readiness — not for the record to have been requested
+          (Repo 1 §11.1 step 3).
+        - The old key stays valid through the configured overlap (Repo 1 §11.1 step 4).
+        - DNS removal of a retired key waits for the retention window (Repo 1 §11.1 step 5).
+        - A REVOKED key never returns to ACTIVE (Repo 1 §11.1 step 6, Appendix F.3).
+      no_secret_transport: >-
+        NO SECRET TRANSPORT (Repo 1 §11.1): private key material never reaches a
+        customer API, a log, an event or browser code. private_key_ref is an
+        opaque secret-manager identifier and never contains PEM material. Only
+        the public key appears in DNS, which is what DNS is for.
+    spec_refs: ["Master §12.3, Appendix F.3", "Repo 1 §11", "RFC 6376"]
+
+  - record_kind: DMARC
+    type: TXT
+    name_pattern: _dmarc.{domain}
+    value_grammar: v=DMARC1; p={policy}; rua=mailto:{aggregate_report_address}
+    ttl_guidance_seconds: 3600
+    required_for_activation: true
+    verification_rule: >-
+      Exactly one v=DMARC1 record exists at _dmarc.{domain}; it parses under
+      RFC 9989; the parser stores the NORMALIZED observation rather than the raw
+      string (Repo 1 §10.2). Alignment semantics are evaluated against RFC 9989.
+    gate: dns_readiness
+    publication_owner: customer
+    policy_progression:
+      source: "Karyalay Email Master Architecture & Integration Contract v1.0 §12.6"
+      rules:
+        - Onboarding SHOULD begin with a monitoring-friendly policy where appropriate.
+        - Administrators are guided toward stronger enforcement after legitimate senders are aligned.
+        - >-
+          Karyalay MUST NOT automatically publish an aggressive reject policy
+          that would break a customer's known legitimate third-party senders
+          without explicit validation and consent.
+    report_handling:
+      aggregate: Operational/security data, parsed through a controlled pipeline (Master §12.6).
+      failure: >-
+        May contain sensitive message information; requires stricter privacy
+        handling if enabled at all (Master §12.6).
+    spec_refs: ["Master §12.3, §12.6", "Repo 1 §10.2", "RFC 9989"]
+
+  - record_kind: AUTOCONFIG
+    type: CNAME
+    name_pattern: autoconfig.{domain}
+    value_grammar: autoconfig.mail.karyalay.in.
+    ttl_guidance_seconds: 3600
+    required_for_activation: false
+    verification_rule: The name resolves to the Karyalay autoconfiguration endpoint and that endpoint serves a valid configuration document.
+    gate: dns_readiness
+    publication_owner: customer
+    notes:
+      - >-
+        A product readiness requirement where adopted, NOT an SMTP delivery gate
+        unless the parent contract says required (Repo 1 §10.2).
+    spec_refs: ["Master §12.3", "Repo 1 §10.2", "Repo 3 §13"]
+
+  - record_kind: AUTODISCOVER
+    type: CNAME
+    name_pattern: autodiscover.{domain}
+    value_grammar: autodiscover.mail.karyalay.in.
+    ttl_guidance_seconds: 3600
+    required_for_activation: false
+    verification_rule: The name resolves to the Karyalay autodiscover endpoint and that endpoint responds to a well-formed discovery request.
+    gate: dns_readiness
+    publication_owner: customer
+    notes:
+      - Same status as AUTOCONFIG — product readiness, not a delivery gate (Repo 1 §10.2).
+    spec_refs: ["Master §12.3", "Repo 1 §10.2", "Repo 3 §13"]
+
+  - record_kind: MTA_STS
+    type: TXT
+    name_pattern: _mta-sts.{domain}
+    value_grammar: v=STSv1; id={policy_id}
+    ttl_guidance_seconds: 300
+    required_for_activation: false
+    verification_rule: >-
+      The TXT id matches the id in the policy served at
+      https://mta-sts.{domain}/.well-known/mta-sts.txt, the policy parses under
+      RFC 8461 with size and time limits enforced, and the HTTPS certificate is
+      publicly trusted and valid for the policy hostname.
+    gate: dns_readiness
+    publication_owner: karyalay
+    companion_records:
+      - type: CNAME
+        name_pattern: mta-sts.{domain}
+        value_grammar: The Karyalay MTA-STS policy host.
+        note: >-
+          The customer delegates the policy hostname; Karyalay serves the policy
+          text. Repo 3 §47 resolves the domain to its tenant policy through a
+          generated read-only mapping — not a tenant API call per request.
+    ordering_rule: >-
+      A policy change updates the _mta-sts TXT id and the HTTPS content in a
+      controlled order (Repo 3 §47). Publishing a new id before the new content
+      is servable makes every conforming sender fetch a policy that is not there.
+    spec_refs: ["Master §12.3", "Repo 1 §10.2", "Repo 3 §33, §47", "RFC 8461"]
+
+  - record_kind: TLS_RPT
+    type: TXT
+    name_pattern: _smtp._tls.{domain}
+    value_grammar: v=TLSRPTv1; rua=mailto:{tls_report_address}
+    ttl_guidance_seconds: 3600
+    required_for_activation: false
+    verification_rule: The record parses under RFC 8460 and the reporting URI is a Karyalay-controlled destination under approved customer configuration.
+    gate: dns_readiness
+    publication_owner: customer
+    notes:
+      - >-
+        No effect on delivery policy. Reports feed Ops and reputation workflows
+        (Repo 3 §33).
+      - >-
+        Transport-security reporting must distinguish remote policy
+        misconfiguration from Karyalay TLS breakage (Repo 3 §33).
+    spec_refs: ["Master §12.3", "Repo 1 §10.2", "Repo 3 §33", "RFC 8460"]
+
+  - record_kind: CAA
+    type: CAA
+    name_pattern: "{domain}"
+    value_grammar: "{flags} {tag} \"{value}\""
+    ttl_guidance_seconds: 3600
+    required_for_activation: false
+    verification_rule: >-
+      If a CAA record set exists, it must permit the ACME issuer Karyalay uses
+      for this domain's service certificates (Repo 3 §46). Absence of CAA is
+      permissive under RFC 8659 and is NOT_APPLICABLE, not a failure.
+    gate: dns_readiness
+    publication_owner: customer
+    notes:
+      - >-
+        A recommendation and a validation input, not a mail activation gate
+        unless configured as one (Repo 1 §10.2).
+    spec_refs: ["Master §12.3", "Repo 1 §10.2", "Repo 3 §46", "RFC 8659"]
+
+  - record_kind: DANE_TLSA
+    type: TLSA
+    name_pattern: _25._tcp.{karyalay_mx_hostname}
+    value_grammar: "{usage} {selector} {matching_type} {certificate_association_data}"
+    ttl_guidance_seconds: 3600
+    required_for_activation: false
+    verification_rule: >-
+      Published only for Karyalay-controlled MX where DNSSEC and the
+      certificate/key lifecycle are operationally mature (Repo 3 §33). Validated
+      against the live certificate chain before and after every rotation.
+    gate: not_applicable
+    publication_owner: karyalay
+    customer_domain_record: false
+    notes:
+      - >-
+        Listed for completeness because Repo 3 §33 requires it, but it is NEVER
+        part of a customer domain's requirement set: TLSA is published on
+        Karyalay's own MX hostnames, which is why record_kind DANE_TLSA does not
+        appear in the Repo 1 Appendix A.7 enumeration.
+      - >-
+        A DNSSEC-bogus response is not silently downgraded (Repo 3 §33). DANE
+        takes precedence over MTA-STS in the security-level ordering.
+      - >-
+        A stale TLSA record after certificate rotation breaks inbound mail from
+        every DANE-enforcing sender. Rotation order is a Repo 3 runbook concern,
+        recorded here so no consumer treats TLSA as a set-once record.
+    spec_refs: ["Repo 3 §33, §45", "RFC 7672"]
+
+# --- reverse DNS ----------------------------------------------------------
+# Not a customer-domain record; recorded because Master §12.3 lists it in the
+# same contract and because getting it wrong is a deliverability failure that
+# no customer-side record can compensate for.
+reverse_dns:
+  applies_to: Karyalay-owned sending IPs
+  publication_owner: karyalay
+  rules:
+    - >-
+      Every outbound sending IP has a stable PTR pointing to a hostname that
+      forward-resolves to the same IP (FCrDNS), and the Postfix EHLO identity is
+      consistent with the configured sending identity (Master Appendix F.2,
+      Repo 3 §13).
+    - >-
+      Changes are controlled, because reputation attaches to IP and name history
+      (Master Appendix F.2).
+    - >-
+      Public IPv6 MUST NOT be announced for SMTP until PTR, firewalling,
+      deliverability and recipient compatibility are certified end to end
+      (Repo 3 §13).
+  spec_refs: ["Master §12.3, Appendix F.2", "Repo 3 §13"]
