@@ -67,3 +67,46 @@ move with the contract. **This needs an owner ruling.**
 **3. `desired_status` has no enumerated vocabulary in either specification.** It
 ships grammar-constrained. Fixtures asserting a rejected unknown status would be
 asserting behaviour the contract does not specify.
+
+---
+
+## Distribution closure — 2026-08-20
+
+**All five repositories green on GitHub Actions in the same round.** This is the
+first time it has happened, and it is the condition ADR-KEM-001 names that the
+2026-08-18 entry could not satisfy: that entry closed the gate *on validation*,
+with every pin resolving through a sibling clone on one machine.
+
+Twenty-six of twenty-six jobs, on runners that had never seen this code:
+
+| Repository | Run | Jobs |
+| --- | --- | --- |
+| `karyalay-mail-contracts` | [32313013165](https://github.com/narmeshnigam/karyalay-mail-contracts/actions/runs/32313013165) | 2 success, 1 skipped (`tag-is-immutable`, tag-triggered) |
+| `karyalay-mail-infra` | [32313009001](https://github.com/narmeshnigam/karyalay-mail-infra/actions/runs/32313009001) | 4 success |
+| `karyalay-mail` | [32316896963](https://github.com/narmeshnigam/karyalay-mail/actions/runs/32316896963) | 7 success, **including the container build** |
+| `karyalay-webmail` | [32316046000](https://github.com/narmeshnigam/karyalay-webmail/actions/runs/32316046000) | 8 success, **including e2e on all three engines** |
+| `karyalay-mail-ops` | [32313017272](https://github.com/narmeshnigam/karyalay-mail-ops/actions/runs/32313017272) | 4 success |
+
+### What getting here found
+
+Every one of these was invisible on the machine the code was written on. That is
+the argument for the gate, stated as evidence rather than as principle.
+
+| Defect | Why only CI could see it |
+| --- | --- |
+| Role-scoped nftables rules emitted invalid syntax | `nft` does not run on macOS. The rulesets would not have loaded on a real host. |
+| The import-boundary lint had never inspected a single import | Unresolved path aliases were classified as external packages. It reported zero violations because it was looking at nothing. |
+| 36 ops directories, 13 mail modules and 4 test suites absent from a clone | git does not track empty directories. The trees existed only locally. |
+| `karyalay-webmail` had no application entry point at all | Only the production build reads `index.html`; typecheck, lint and unit tests all pass without one. |
+| `upgrade-insecure-requests` in the meta tag killed the app in WebKit | Chromium and Gecko exempt loopback; WebKit does not. Two of three engines were perfectly green. |
+| The fail-closed diagnostic pages rendered unstyled | `style-src-attr` blocks the attribute form. The pages still *read* correctly, so every content assertion passed. |
+| The CSP feature probe used a property name no browser has | `"securitypolicyviolation" in window` is false everywhere; the attribute is `onsecuritypolicyviolation`. Every real user would have been shown the upgrade page. |
+| The runtime container had none of its five PHP extensions | The image would have died on its first request. |
+| `--testsuite` repeated: 7 tests ran while four suites were reported | PHPUnit silently uses only the last occurrence. |
+| A CI job hung for three hours on an interactive apt prompt | No job had a timeout; the default is six. |
+
+### Standing caveat
+
+`tag-is-immutable` is skipped on push and runs on tag. It has therefore never
+executed. It is not evidence of anything yet, and this entry does not claim it
+is.
