@@ -391,12 +391,17 @@ only, and Repo 1's T08.06 covers application config rather than the machine.
 They depend only on the Phase 1 baseline, and **Wave 4 cannot open without
 them** — Repo 1 has nowhere to serve from and no IdP to validate against.
 
-**T03.08's size is not yet known.** ADR-INF-033 accepts the `control-plane` and
-`staging` roles outright but holds the `idp` role conditional on T00.08, which
-runs in Wave 0. If the parent Karyalay system already operates a federatable
-provider, T03.08 collapses to inventory membership and monitoring. If not, it is
-a full build — host, TLS, backups, restore drill, alerting — and this wave grows.
-Do not size Wave 3 before T00.08 reports.
+**T03.08 is a full build. T00.08 reported on 2026-08-21** — the programme owner
+confirmed the parent Karyalay platform operates no OIDC provider, *and* that mail
+is to remain independent of it. ADR-INF-033's `idp` role is activated and this
+wave grows accordingly: host, TLS, its own database with backup and PITR, a
+tested restore drill, availability alerting with a named pager owner, realm and
+audience configuration as code, and an upgrade policy.
+
+The independence clause is the durable half. Federation is now a change to
+ADR-INF-033 rather than a deferred default, so Wave 4 does not need to keep a
+branch open for it — but the IdP is a single point of failure for all browser and
+API access to mail, and Wave 4 cannot open without it running.
 
 They sit in Phase 3 rather than Phase 1 for a reason worth keeping: Phase 1's
 gate then closes on mail-baseline evidence alone, so Phase 2 is never held up by
@@ -623,11 +628,11 @@ constraint, reopen ADR-OPS-022 rather than quietly slipping the gate.**
 | Editing a phase status directly | Task tree stops meaning anything | Roll-up rule — status derives from tasks only |
 | Filing Barracuda delisting early | Denial on a dark IP, and denials are remembered | Wait for Postfix + TLS + DKIM live |
 | Starting Repo 3 Phase 1 before Phase 0 skeleton | Playbooks with no home, no CI gate | T00.03 → T00.04 → T01.01 |
+| **Sizing Wave 3 as if T03.08 were a hookup** | T00.08 answered NO on 2026-08-21: it is a full Keycloak build, weeks not days | ADR-INF-033; `evidence/phase-00/T00.08/FINDING.md` |
 | **Deferring T01.03 to Wave 2 because "Phase 1 needs the tag"** | A live public host stays unfirewalled for weeks on a dependency that does not exist | Phase 1 needs T00.03 + T00.04 only — §4 Wave 0 Track B |
 | **Leaving Repo 1 T07.01 to spare capacity** | Repo 4 cannot start *at all* — Phase 0 gates on it and every later phase gates on Phase 0 | T07.01 immediately after Repo 1 Phase 2 exits |
 | **Treating `content.karyalay.site` as a deployment detail** | Origin assumptions set in Phase 0 code; retrofit means auditing every content path in a shipped client | Two origins wired from webmail T00.06/T00.08 |
 | **Assuming someone owns `vps_server_1` and the IdP** | Hand-configured hosts at the moment Wave 4 needs them; §53 evidence unobtainable after the fact | ADR-INF-033; Repo 3 T03.07/T03.08 |
-| **Sizing Wave 3 before T00.08 reports** | T03.08 is either a monitoring hookup or a full Keycloak build — a difference too large to average over | Run T00.08 in Wave 0 |
 
 ---
 
