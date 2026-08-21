@@ -413,9 +413,22 @@ hosts the mail plane does not use.
 
 ---
 
+> **Wave 3 status, 2026-08-22.** Both Repo 1 exit gates are ☑ and the mail plane
+> is proven end-to-end on mx1 from the public Internet — not asserted. T03.07 and
+> T03.08 remain ⛔: complete as code, never run, because no machine exists for
+> either. Wave 4 is blocked on exactly two hosts. Full account in
+> [wave-3-closure.md](wave-3-closure.md).
+
+---
+
 ### Wave 4 — Second convergence: live API
 
 Entry condition: **Repo 1 serving a real API against a real mail plane.**
+
+> The mail-plane half is met. The serving half is not: `cp1` and `idp1` carry
+> RFC 5737 placeholder addresses and `maintenance_state: provisioning`, which
+> `tests/config/inventory.test.mjs` refuses to let them leave while a
+> documentation address remains.
 
 | Repo | What opens |
 | --- | --- |
