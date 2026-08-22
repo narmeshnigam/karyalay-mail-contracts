@@ -1,10 +1,45 @@
 # Wave 3 — closure record
 
-**Date:** 2026-08-22 · Companion to [BUILD-ORDER.md](BUILD-ORDER.md) §4 Wave 3.
+**Date:** 2026-08-22 · **Revised:** 2026-08-22 evening (see §0) · Companion to
+[BUILD-ORDER.md](BUILD-ORDER.md) §4 Wave 3.
 
-Wave 3's entry condition was *"this is where mocks run out"*. It has been met.
-Its **exit** condition has not, and the gap is two machines rather than any
-amount of remaining work.
+Wave 3's entry condition was *"this is where mocks run out"*. It has been met,
+and as of this revision so has the **exit** condition for Wave 4's purposes.
+
+---
+
+## 0. Revision — the two machines now exist
+
+**This document was first written on the afternoon of 2026-08-22 and was stale
+within three hours.** It reported T03.07 and T03.08 as ⛔ "no machine exists."
+Both hosts were provisioned and converged the same evening:
+
+| | Then (afternoon) | Now (evening, commits `1a9d916`, `1d949f2`) |
+| --- | --- | --- |
+| `cp1.karyalay.site` | RFC 5737 placeholder, `maintenance_state: provisioning` | Real address, **`active`**, `bootstrap.yml` + `control-plane.yml` converged, second run clean (§53), serving `api.karyalay.site` on a trusted certificate |
+| `idp1.karyalay.site` | RFC 5737 placeholder, `maintenance_state: provisioning` | Real address, **`active`**, `idp.yml` converged, Keycloak 26.7.2 pinned |
+
+Nine defects surfaced that only running found — the same lesson §2 records for
+the mail plane, arriving a second time on different hosts.
+
+**T03.07 and T03.08 nevertheless stay `in-progress`, deliberately.** The
+programme owner elected to provision production only and **defer staging**
+(`cp1.staging.karyalay.site`, `vps_server_3`). Both task files say in terms that
+they close PARTIALLY and are not to be ticked ☑, because T03.08's acceptance
+criteria say karyalay-mail validates "in staging and production" and only
+production is true. Their `in-progress` status is the correct record, not a
+stale one.
+
+What deferring staging costs is recorded in T03.07 rather than left to be
+discovered: §6 artifact promotion is unrehearsed, so every production converge is
+also its own first rehearsal, and the cross-origin and TLS rehearsals have
+nothing to run against.
+
+Sections 1 and 3 below are preserved as written, with the superseded rows marked.
+The inventory is authoritative; where this document and
+`inventory/environments/production.yml` disagree, the inventory wins.
+
+---
 
 ---
 
@@ -14,18 +49,20 @@ amount of remaining work.
 | --- | --- | --- | --- |
 | T05.08 — real-Dovecot + adversarial suite | Repo 1 | ☑ | 29 tests / 203 assertions against production **Dovecot 2.4.1 on mx1**, over IMAPS with a master-user session and the doveadm HTTP API. Run on the host so the credential that opens every mailbox never left it. |
 | T06.09 — duplicate/ambiguous-send suite | Repo 1 | ☑ | 121 tests over 43 injected Postfix faults, asserting against the persisted A.34 record rather than a return value. Eight sabotages, each confirmed failing and reverted. |
-| T03.07 — control-plane + staging hosts | Repo 3 | ⛔ | Roles, playbook, firewall rows, inventory records and negative tests all exist. **No machine exists.** |
-| T03.08 — OIDC identity provider host | Repo 3 | ⛔ | Same: `idp` role, `idp.yml`, realm generation, database with WAL archiving and probes. **No machine exists.** |
+| T03.07 — control-plane + staging hosts | Repo 3 | ◐ | ~~⛔ No machine exists.~~ **Superseded — see §0.** `cp1` converged and `active` the same evening. Staging half deferred by the programme owner, so the task stays ◐ by design. |
+| T03.08 — OIDC identity provider host | Repo 3 | ◐ | ~~⛔ No machine exists.~~ **Superseded — see §0.** `idp1` converged and `active`, Keycloak 26.7.2 pinned. Staging IdP deferred, so the task stays ◐ by design. |
 
-The two ⛔ rows are not partially done. They are complete as code and have never
-run against hardware, because the hosts they describe carry RFC 5737
-documentation addresses — `203.0.113.1` and `203.0.113.2` — chosen so the values
-are unroutable and recognisable rather than plausible.
+**As first written, the two rows read ⛔ and said this:** *"They are complete as
+code and have never run against hardware, because the hosts they describe carry
+RFC 5737 documentation addresses — `203.0.113.1` and `203.0.113.2` — chosen so
+the values are unroutable and recognisable rather than plausible."* That was true
+for about three hours.
 
-`tests/config/inventory.test.mjs` refuses to let either host leave
-`maintenance_state: provisioning` while a documentation address is still there.
-That refusal is the reason this is a visible blocker rather than a surprise
-during a Wave 4 deploy.
+`tests/config/inventory.test.mjs` refused to let either host leave
+`maintenance_state: provisioning` while a documentation address was still there.
+That refusal did its job: it made the gap a visible blocker rather than a
+surprise during a Wave 4 deploy, and clearing it was the mechanical promotion
+§3 describes.
 
 ---
 
@@ -69,11 +106,12 @@ this file, does this port accept — not value checks.
 | Half | State |
 | --- | --- |
 | a real mail plane | ✅ **met** — proven end-to-end today, not asserted |
-| Repo 1 serving a real API | ❌ **blocked** — there is no host to serve from, and no IdP to validate tokens against |
+| Repo 1 serving a real API | ◐ **hosts met, deploy outstanding** — `cp1` serves `api.karyalay.site` on a trusted certificate and `idp1` serves `id.karyalay.site`; 443 answers **502 until Repo 1's application is deployed onto cp1**, which is Repo 1's half of the ADR-INF-033 boundary |
 
-So Wave 4 is blocked on exactly two machines, and BUILD-ORDER already said so:
-*"Wave 4 cannot open without them — Repo 1 has nowhere to serve from and no IdP
-to validate against."*
+**Wave 4's blocker is no longer machines.** As first written this section said
+Wave 4 was "blocked on exactly two machines"; both were provisioned the same
+evening (§0). What remains is a deployment, not a procurement: Repo 3 owns the
+machine, Repo 1 owns the application that deploys onto it.
 
 ### What each machine is for
 
@@ -98,13 +136,24 @@ That refusal is deliberate: ADR-INF-024 keeps mail flowing through Dovecot
 during an IdP outage, and a mail listener on the IdP host would delete that
 mitigation.
 
-### Promotion is mechanical once the machines exist
+### Promotion was mechanical, and has been done
 
-1. replace the two placeholder addresses in
-   `inventory/environments/production.yml`;
-2. flip `maintenance_state` to `active` (the inventory test then stops refusing);
-3. `bootstrap.yml`, then `control-plane.yml` and `idp.yml`;
-4. publish `api.karyalay.site` and `id.karyalay.site` as DNS-only A records.
+All four steps ran on the evening of 2026-08-22:
+
+1. ~~replace the two placeholder addresses in~~
+   `inventory/environments/production.yml` — ☑ real addresses recorded;
+2. ~~flip `maintenance_state` to `active`~~ — ☑ both hosts `active`, the
+   inventory test stopped refusing;
+3. ~~`bootstrap.yml`, then `control-plane.yml` and `idp.yml`~~ — ☑ converged,
+   with a clean second run on both (§53);
+4. ~~publish `api.karyalay.site` and `id.karyalay.site` as DNS-only A records~~ —
+   ☑ published; `api.karyalay.site` answers on a trusted certificate.
+
+It was mechanical in shape and not in practice: **nine defects surfaced that only
+running found**, including certbot that could never have run, six nginx validate
+hooks that could never have fired, and a management tunnel with no port open on
+the hosts it manages. Every one passed the structural gates — the same shape §2
+records for the mail plane.
 
 Two constraints carried from earlier in the programme apply to the order:
 

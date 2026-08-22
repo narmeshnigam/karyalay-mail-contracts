@@ -413,11 +413,24 @@ hosts the mail plane does not use.
 
 ---
 
-> **Wave 3 status, 2026-08-22.** Both Repo 1 exit gates are ☑ and the mail plane
-> is proven end-to-end on mx1 from the public Internet — not asserted. T03.07 and
-> T03.08 remain ⛔: complete as code, never run, because no machine exists for
-> either. Wave 4 is blocked on exactly two hosts. Full account in
-> [wave-3-closure.md](wave-3-closure.md).
+> **Wave 3 status, 2026-08-22 (evening).** Both Repo 1 exit gates are ☑ and the
+> mail plane is proven end-to-end on mx1 from the public Internet — not asserted.
+> **T03.07 and T03.08 have converged**: `cp1` and `idp1` are provisioned,
+> `maintenance_state: active`, with a clean second run on both. Nine defects
+> surfaced that only running found.
+>
+> Both tasks stay ◐ **by design, not by staleness** — the programme owner elected
+> to provision production only and defer staging, and both task files say in
+> terms that they close partially and are not to be ticked ☑.
+>
+> **Wave 4's remaining blocker is a deployment, not a machine.** `cp1` serves
+> `api.karyalay.site` on a trusted certificate and answers 502 until Repo 1's
+> application is deployed onto it. Full account in
+> [wave-3-closure.md](wave-3-closure.md) §0.
+>
+> An earlier revision of this note read *"T03.07 and T03.08 remain ⛔ … Wave 4 is
+> blocked on exactly two hosts."* That was written hours before both hosts came
+> up; it is superseded.
 
 ---
 
@@ -425,10 +438,15 @@ hosts the mail plane does not use.
 
 Entry condition: **Repo 1 serving a real API against a real mail plane.**
 
-> The mail-plane half is met. The serving half is not: `cp1` and `idp1` carry
-> RFC 5737 placeholder addresses and `maintenance_state: provisioning`, which
-> `tests/config/inventory.test.mjs` refuses to let them leave while a
-> documentation address remains.
+> **Both halves are now substantially met (2026-08-22 evening).** The mail plane
+> is proven end-to-end on mx1. `cp1` and `idp1` are converged and `active`, so
+> there is a host to serve from and an IdP to validate against — what remains is
+> deploying Repo 1's application onto cp1, which is Repo 1's half of the
+> ADR-INF-033 boundary.
+>
+> An earlier revision read *"the serving half is not: `cp1` and `idp1` carry RFC
+> 5737 placeholder addresses and `maintenance_state: provisioning`"*. Superseded;
+> the inventory now carries real addresses.
 
 | Repo | What opens |
 | --- | --- |
