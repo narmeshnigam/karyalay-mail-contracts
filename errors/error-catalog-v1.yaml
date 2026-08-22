@@ -7,7 +7,7 @@
 # Validated against errors/error-catalog-v1.schema.json.
 
 contract: karyalay-mail-contracts/errors
-contract_version: 0.2.1
+contract_version: 0.3.0
 type_uri_template: "https://errors.karyalay.in/mail/{code}"
 sources:
   codes: karyalay-mail repository-spec-v1.0 Appendix E

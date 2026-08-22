@@ -180,6 +180,61 @@ forced, and that is the design working:
    `webmail_contacts_v1`, `webmail_org_directory_v1` per Appendix S; build
    T01.09, T04.05, T04.06.
 
+## Also in `v0.3.0` — a dropped idempotency requirement
+
+Found while Repo 4 built its envelope layer against the pinned contract, and
+folded in here because it ships in the same version.
+
+`gen_openapi.py` decided whether `Idempotency-Key` was mandatory by regexing the
+card's prose **Notes** line for the literal token `Idempotency-Key required`.
+The structured **Idempotency** row — the normative one — was never read, because
+it is byte-identical boilerplate on all 107 cards: *"Required for POST
+create/final-send/provisioning/restriction operations."* It names the classes
+without saying which class a card is in, and the Notes line is where a card says
+that, in prose.
+
+Two cards state the requirement in a phrasing the regex missed:
+
+| Card | Notes says | Class | Emitted |
+| --- | --- | --- | --- |
+| **C.100** `reportProvisioningResult` | "Generation and idempotency validation **mandatory**" | provisioning | `required: false` |
+| **C.101** `requestRestriction` | "reason, evidence/case ref, **idempotency required**" | restriction | `required: false` |
+
+Both are replay-sensitive mutations arriving from another service — the exact
+case Master §20.5 exists for. C.101 is the sharper one: its card says *required*
+in as many words, **and** its class is named explicitly in the row above. It
+emitted an optional header on both counts.
+
+The regex now matches the requirement however the card phrases it. It
+deliberately does **not** match a bare "idempotent", which is a claim about the
+operation's semantics rather than about the caller's duty to send a key.
+Widening it that far would put a mandatory header on C.75's flag mutation on the
+strength of the words "idempotent flag semantics".
+
+**Four cards sit in that ambiguous set and are not resolved here** — C.16
+("Idempotent; audit reason required"), C.29 ("Reason mandatory; idempotent"),
+C.75 ("idempotent flag semantics"), C.77 ("Same batch/idempotency rules"). Each
+says the operation *is* idempotent without saying a key is required, and
+deciding that in the generator would be precisely the reinterpretation
+`specmd.py` forbids. **This is a question for the Appendix C owner**, not a
+defect with an obvious fix.
+
+A confirmation the change is right: the generator emits error responses from
+`errors/error-catalog-v1.yaml`, and making the key required pulled
+`IDEMPOTENCY_KEY_REQUIRED` into both documents automatically. The code was
+already in the catalog; neither document had an operation that could return it.
+
+**This half is breaking, not additive** — a client omitting the header now gets
+a 400. It is free today and will not be later: Repo 1 has implemented neither
+C.100 nor C.101, and Repo 4's `repo1client` is empty by design. There is no
+deployed consumer to break, which is the argument for doing it now rather than
+discovering it after one exists.
+
+Repo 1's T07.01 already compensates independently — its progress note records
+that "idempotence is at the store, by (resource, code, source), not only at the
+HTTP idempotency key", because an Ops retry with a fresh key would otherwise
+stack a duplicate. The contract now says what that implementation already does.
+
 ## Consequences
 
 **`v0.3.0` is additive and shared-compatible.** Seven new operations, three new

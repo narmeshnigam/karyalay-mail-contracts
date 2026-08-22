@@ -13,7 +13,7 @@
 #          Repo 2 Appendix K/Appendix U; Repo 3 §66–§68; Repo 4 §85/Appendix V.
 
 contract: karyalay-mail-contracts/observability
-contract_version: 0.2.1
+contract_version: 0.3.0
 sources:
   observability_baseline: Karyalay Email Master Architecture & Integration Contract v1.0 §30
   correlation: "Master §20.7, §6.2, §6.3, §22.3"

@@ -437,7 +437,36 @@ def build_operation(card, binding, catalog_codes):
         )
 
     # --- idempotency: required where the card says so ----------------------
-    idempotency_required = bool(re.search(r"Idempotency-Key (?:required|mandatory)|Idempotency-Key;", notes, re.I))
+    #
+    # The card states the requirement in two places and this reads both.
+    #
+    # The structured `Idempotency` row carries the class rule -- "Required for
+    # POST create/final-send/provisioning/restriction operations" -- but it is
+    # byte-identical boilerplate on all 107 cards, so it says which *classes*
+    # need a key without saying which class a given operation is in. The Notes
+    # line is where a card declares that, and it does so in prose.
+    #
+    # The first pattern below used to be the only one, and it matched the
+    # literal token `Idempotency-Key`. C.101's Notes say "idempotency
+    # required" -- the same requirement, two words different -- so it emitted
+    # `required: false` on an operation whose own card says required, and
+    # whose class (restriction) the row names explicitly. C.100 ("idempotency
+    # validation mandatory") failed the same way. Both are replay-sensitive
+    # mutations from Ops, which is the exact case Master §20.5 exists for.
+    #
+    # The second pattern matches the requirement however the card phrases it.
+    # It deliberately does NOT match a bare "idempotent", which is a claim
+    # about the operation's semantics rather than about the caller's duty to
+    # send a key -- C.75's "idempotent flag semantics" is not a key
+    # requirement, and reading it as one would put a mandatory header on a
+    # flag mutation. Four cards sit in that ambiguous set (C.16, C.29, C.75,
+    # C.77); they are recorded in ADR-KEM-010 as a question for the appendix
+    # owner rather than resolved by this generator, because deciding them here
+    # would be exactly the reinterpretation specmd.py forbids.
+    idempotency_required = bool(
+        re.search(r"Idempotency-Key (?:required|mandatory)|Idempotency-Key;", notes, re.I)
+        or re.search(r"idempotenc(?:y|e)\b[^.;]{0,40}?\b(?:required|mandatory)", notes, re.I)
+    )
     if method == "post" and idempotency_required:
         operation.setdefault("parameters", []).append(
             {

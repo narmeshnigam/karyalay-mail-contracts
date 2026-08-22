@@ -6,7 +6,7 @@
 # Filename fixed by Master Contract §0.3.
 
 contract: karyalay-mail-contracts/auth/roles
-contract_version: 0.2.1
+contract_version: 0.3.0
 sources:
   role_catalog: "Karyalay Email Master Architecture & Integration Contract v1.0 §10.2, §10.3"
   default_permissions: "karyalay-mail repository-spec-v1.0 Appendix B (inverted)"

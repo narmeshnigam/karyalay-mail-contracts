@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — operations API"
-  version: 0.2.1
+  version: 0.3.0
   summary: "The typed restriction, diagnostics and security-signal surface karyalay-mail-ops calls. Ops requests; karyalay-mail decides and applies."
   description: "The typed restriction, diagnostics and security-signal surface karyalay-mail-ops calls. Ops requests; karyalay-mail decides and applies.\n\n**Source:** karyalay-mail repository-spec-v1.0 §30, Appendix C.101-C.104; karyalay-mail-ops Appendix AI.\n**Audience:** karyalay-mail-ops service identities. Not a public route (Repo 1 §29.2).\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 4 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.2.1
+  x-karyalay-contract-version: 0.3.0
 servers:
   - url: https://internal.mail.karyalay.in
     description: Production.
@@ -42,8 +42,8 @@ paths:
       parameters:
         - name: Idempotency-Key
           in: header
-          required: false
-          description: "Honoured when supplied (Master §20.5)."
+          required: true
+          description: "Required by this operation's Appendix C card. Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1)."
           schema:
             type: string
             maxLength: 128
@@ -63,6 +63,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Restriction"
+        "400":
+          "$ref": "#/components/responses/E400"
         "401":
           "$ref": "#/components/responses/E401"
         "403":
@@ -1028,6 +1030,51 @@ components:
                   - AUTH_MFA_REQUIRED
                   - AUTH_REAUTH_REQUIRED
                   - AUTH_REQUIRED
+              detail:
+                type: string
+                description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."
+              request_id:
+                type: string
+                maxLength: 128
+              trace_id:
+                type: string
+                pattern: "^[0-9a-f]{32}$"
+              errors:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/ValidationError"
+    E400:
+      description: "IDEMPOTENCY_KEY_REQUIRED — Key required for endpoint. (NON_RETRYABLE)"
+      headers:
+        X-Request-ID:
+          "$ref": "#/components/headers/RequestId"
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            description: "RFC 9457 problem details for HTTP 400. `code` is narrowed to the catalog codes that map to this status."
+            required:
+              - type
+              - title
+              - status
+              - code
+            properties:
+              type:
+                type: string
+                format: uri
+                description: "https://errors.karyalay.in/mail/{code}"
+              title:
+                type: string
+              status:
+                type: integer
+                minimum: 100
+                maximum: 599
+                const: 400
+              code:
+                type: string
+                description: A code from errors/error-catalog-v1.yaml whose default HTTP mapping is 400.
+                enum:
+                  - IDEMPOTENCY_KEY_REQUIRED
               detail:
                 type: string
                 description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."
