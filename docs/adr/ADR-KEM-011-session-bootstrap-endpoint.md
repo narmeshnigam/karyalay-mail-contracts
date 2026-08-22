@@ -56,7 +56,31 @@ One operation. `GET /api/v1/me/session` → `Session`, permission `authenticated
 
 It belongs in the **public-control** document, beside C.61/C.62 under a `Sessions` tag, and it is a read of state Repo 1 already holds: the OIDC subject from the token, the organisation from `TenantContext`, the mailboxes from the access-grant tables C.34–C.36 already serve, and the permissions from the §18 policy engine that already computes them per request.
 
-**It invents no data.** That is the argument for it being cheap: every member above is something Repo 1 can already answer, assembled into one response so the client stops deriving it from failures.
+**It invents no data** — but one member has no projection yet, and that was
+overstated when this ADR was accepted.
+
+`mailboxes` is answerable today only for **delegated** access: C.34–C.36's grant
+tables record principal → mailbox for a grant. **Owned** mailboxes have no such
+projection. `ObjectRelationFactor` says so in as many words:
+
+> "The owner mapping is not implemented — A.18's identity binds an address to a
+> mailbox, not a principal to one, and the principal → mailbox projection
+> arrives with T02.04's sessions. Until then only an explicit grant satisfies
+> this, **which denies a mailbox's own owner**."
+
+T02.04 is recorded `done` and the projection did not arrive with it; nothing in
+`src/` provides one. So C.115 has a prerequisite: **the principal → mailbox
+owner projection must be built before `mailboxes` can be populated**, and a
+bootstrap that returned only delegated mailboxes would show a user every mailbox
+except their own.
+
+That comment also records the right instinct about how to build it — the
+rejected placeholder, "treat any tenant member as the owner", would give every
+member of an organisation read access to every mailbox in it. The projection has
+to be real.
+
+The rest of the response stands as described: subject from the token,
+organisation from `TenantContext`, permissions from the §18 engine.
 
 ## Alternatives considered
 
@@ -68,7 +92,7 @@ It belongs in the **public-control** document, beside C.61/C.62 under a `Session
 
 ## Consequences
 
-`v0.4.0`, additive, tagged 2026-08-22. **C.115 `GET /api/v1/me/session` → `Session`**, with `SessionMailbox` for the switcher entries. One endpoint in Repo 1 reading tables it already owns. Repo 2's T00.05 becomes automatable, T04.01's ledger becomes a cache rather than the source, and forwarding's loop check gets its comparison set.
+`v0.4.0`, additive, tagged 2026-08-22. **C.115 `GET /api/v1/me/session` → `Session`**, with `SessionMailbox` for the switcher entries. One endpoint in Repo 1, plus the owner projection named above — which is a prerequisite, not a detail. Repo 2's T00.05 becomes automatable, T04.01's ledger becomes a cache rather than the source, and forwarding's loop check gets its comparison set.
 
 Two members carry guards worth stating, because both are places a client could
 reasonably get it wrong:
