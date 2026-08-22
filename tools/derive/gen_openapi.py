@@ -73,6 +73,7 @@ TAG_DESCRIPTIONS = {
     "Organisation": "Organisation mail profile and activation state (Repo 1 §8).",
     "Entitlements": "Plan limits and feature availability. The commercial system remains source of truth (Repo 1 §9).",
     "Members": "Mail-related organisation membership and role assignment (Repo 1 §8, §18).",
+    "Directory": "Bounded organisation directory search for addressable members (D-05, ADR-KEM-010).",
     "Domains": "Hosted domain lifecycle, DNS readiness and DKIM (Repo 1 §10, §11).",
     "Domain transfers": "Controlled cross-organisation domain transfer under dual authorization (Repo 1 §10.4).",
     "Mailboxes": "Mailbox lifecycle, quota, usage and recovery (Repo 1 §12, §16).",
@@ -88,6 +89,7 @@ TAG_DESCRIPTIONS = {
     "Security": "Tenant-visible security events (Repo 1 §37.2).",
     "Exports": "Asynchronous data export jobs (Repo 1 §38).",
     "Folders": "Mailbox folders, backed by MailboxBackend (Repo 1 §20.1).",
+    "Contacts": "Personal contacts, private to the mailbox principal (D-04, ADR-KEM-010).",
     "Messages": "Message retrieval, mutation and threading (Repo 1 §20, §21.1, §24).",
     "Search": "Typed-AST mailbox search (Repo 1 §21.2).",
     "Drafts": "Draft lifecycle with ETag concurrency (Repo 1 §22).",
@@ -104,6 +106,7 @@ TAG_BY_PREFIX = [
     ("/api/v1/organisations/{org}/mail", "Organisation"),
     ("/api/v1/organisations/{org}/entitlements", "Entitlements"),
     ("/api/v1/organisations/{org}/members", "Members"),
+    ("/api/v1/organisations/{org}/directory", "Directory"),
     ("/api/v1/organisations/{org}/domains", "Domains"),
     ("/api/v1/organisations/{org}/mailboxes", "Mailboxes"),
     ("/api/v1/organisations/{org}/audit-events", "Audit"),
@@ -127,6 +130,7 @@ TAG_BY_PREFIX = [
     ("/api/v1/mailboxes/{mailbox}/restrictions", "Restrictions"),
     ("/api/v1/mailboxes/{mailbox}/usage", "Mailboxes"),
     ("/api/v1/mailboxes/{mailbox}/folders", "Folders"),
+    ("/api/v1/mailboxes/{mailbox}/contacts", "Contacts"),
     ("/api/v1/mailboxes/{mailbox}/messages", "Messages"),
     ("/api/v1/mailboxes/{mailbox}/threads", "Messages"),
     ("/api/v1/mailboxes/{mailbox}/search", "Search"),
@@ -167,6 +171,7 @@ PARAM_DESCRIPTIONS = {
     "export": "Data export job identifier.",
     "operation": "Provisioning operation identifier.",
     "restriction": "Restriction identifier.",
+    "contact": "Personal contact identifier (C.109 notes: private to the mailbox principal).",
     "type": "Resource type (Repo 1 Appendix A.31 `resource_type`).",
     "id": "Resource identifier.",
 }
@@ -442,7 +447,7 @@ def build_operation(card, binding, catalog_codes):
     #
     # The structured `Idempotency` row carries the class rule -- "Required for
     # POST create/final-send/provisioning/restriction operations" -- but it is
-    # byte-identical boilerplate on all 107 cards, so it says which *classes*
+    # byte-identical boilerplate on all 114 cards, so it says which *classes*
     # need a key without saying which class a given operation is in. The Notes
     # line is where a card declares that, and it does so in prose.
     #
@@ -675,8 +680,8 @@ def build_document(doc_key, cards, catalog):
 def main():
     catalog = load_error_catalog()
     cards = parse_cards()
-    if len(cards) != 107:
-        sys.exit("Appendix C parsed to %d cards; the appendix preamble states 107" % len(cards))
+    if len(cards) != 114:
+        sys.exit("Appendix C parsed to %d cards; the appendix preamble states 114" % len(cards))
 
     missing = sorted(set(c["id"] for c in cards) - set(OPS))
     if missing:
@@ -713,8 +718,8 @@ def main():
                     }
                 )
 
-    if total != 107:
-        sys.exit("emitted %d operations; expected 107" % total)
+    if total != 114:
+        sys.exit("emitted %d operations; expected 114" % total)
 
     reconciliation.sort(key=lambda r: int(r["catalog_id"].split(".")[1]))
     specmd.write_yaml(
@@ -723,7 +728,7 @@ def main():
             "contract": "karyalay-mail-contracts/openapi",
             "contract_version": CONTRACT_VERSION,
             "source": "karyalay-mail repository-spec-v1.0 Appendix C",
-            "declared_operation_count": 107,
+            "declared_operation_count": 114,
             "emitted_operation_count": total,
             "public_surface_count": sum(1 for r in reconciliation if r["catalog_id"] in ["C.%d" % n for n in list(range(1, 66)) + list(range(92, 97))]),
             "operations": reconciliation,

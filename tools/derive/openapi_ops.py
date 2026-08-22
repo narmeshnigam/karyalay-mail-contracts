@@ -140,6 +140,14 @@ OPS = {
     "C.102": dict(doc=OPERATIONS, op="clearRestriction", res="Restriction"),
     "C.103": dict(doc=OPERATIONS, op="getResourceDiagnostics", res="ResourceDiagnostics"),
     "C.104": dict(doc=OPERATIONS, op="submitSecurityEvent", req="SecurityEventSubmission", status=202, res="SecurityEventAccepted"),
+    # --- D-01/D-04/D-05, accepted by ADR-KEM-010 --------------------------
+    "C.108": dict(doc=MAILBOX, op="listMailboxThreads", res="ThreadSummary", list=True),
+    "C.109": dict(doc=MAILBOX, op="listMailboxContacts", res="Contact", list=True),
+    "C.110": dict(doc=MAILBOX, op="createMailboxContact", req="ContactWrite", res="Contact", status=201),
+    "C.111": dict(doc=MAILBOX, op="getMailboxContact", res="Contact"),
+    "C.112": dict(doc=MAILBOX, op="updateMailboxContact", req="ContactWrite", res="Contact"),
+    "C.113": dict(doc=MAILBOX, op="deleteMailboxContact", status=204),
+    "C.114": dict(doc=PUBLIC, op="searchOrganisationDirectory", res="DirectoryEntry", list=True),
 }
 
 # Query parameters that a card's Notes name explicitly. Nothing is added that a
@@ -162,4 +170,7 @@ QUERY = {
     "C.92": ["cursor", "limit", "from", "to", "action", "resource_type"],
     "C.93": ["cursor", "limit", "from", "to", "severity"],
     "C.96": ["cursor", "limit"],
+    "C.108": ["folder_ref", "q", "cursor", "limit"],
+    "C.109": ["q", "cursor", "limit"],
+    "C.114": ["q", "cursor", "limit"],
 }

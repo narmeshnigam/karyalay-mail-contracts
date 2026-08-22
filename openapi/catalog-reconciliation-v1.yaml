@@ -7,8 +7,8 @@
 contract: karyalay-mail-contracts/openapi
 contract_version: 0.3.0
 source: karyalay-mail repository-spec-v1.0 Appendix C
-declared_operation_count: 107
-emitted_operation_count: 107
+declared_operation_count: 114
+emitted_operation_count: 114
 public_surface_count: 70
 operations:
   - catalog_id: C.1
@@ -653,3 +653,45 @@ operations:
     operation_id: getVersion
     document: internal-provisioning-api-v1.yaml
     permission: api_service
+  - catalog_id: C.108
+    method: GET
+    path: "/api/v1/mailboxes/{mailbox}/threads"
+    operation_id: listMailboxThreads
+    document: mailbox-api-v1.yaml
+    permission: mail.read
+  - catalog_id: C.109
+    method: GET
+    path: "/api/v1/mailboxes/{mailbox}/contacts"
+    operation_id: listMailboxContacts
+    document: mailbox-api-v1.yaml
+    permission: mail.read
+  - catalog_id: C.110
+    method: POST
+    path: "/api/v1/mailboxes/{mailbox}/contacts"
+    operation_id: createMailboxContact
+    document: mailbox-api-v1.yaml
+    permission: mail.write
+  - catalog_id: C.111
+    method: GET
+    path: "/api/v1/mailboxes/{mailbox}/contacts/{contact}"
+    operation_id: getMailboxContact
+    document: mailbox-api-v1.yaml
+    permission: mail.read
+  - catalog_id: C.112
+    method: PATCH
+    path: "/api/v1/mailboxes/{mailbox}/contacts/{contact}"
+    operation_id: updateMailboxContact
+    document: mailbox-api-v1.yaml
+    permission: mail.write
+  - catalog_id: C.113
+    method: DELETE
+    path: "/api/v1/mailboxes/{mailbox}/contacts/{contact}"
+    operation_id: deleteMailboxContact
+    document: mailbox-api-v1.yaml
+    permission: mail.write
+  - catalog_id: C.114
+    method: GET
+    path: "/api/v1/organisations/{org}/directory"
+    operation_id: searchOrganisationDirectory
+    document: public-control-api-v1.yaml
+    permission: member.view

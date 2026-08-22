@@ -65,13 +65,13 @@ of what the three deltas may expose.
 
 | ID | Document | Operation | Method / path | Response |
 | --- | --- | --- | --- | --- |
-| **C.108** | mailbox | `listMailboxThreads` | `GET /mailbox/v1/mailboxes/{mailbox}/threads` | `ThreadSummary`, cursor page |
-| **C.109** | mailbox | `listMailboxContacts` | `GET /mailbox/v1/mailboxes/{mailbox}/contacts` | `Contact`, cursor page |
-| **C.110** | mailbox | `createMailboxContact` | `POST /mailbox/v1/mailboxes/{mailbox}/contacts` | `Contact`, 201 |
-| **C.111** | mailbox | `getMailboxContact` | `GET /mailbox/v1/mailboxes/{mailbox}/contacts/{contact}` | `Contact` |
-| **C.112** | mailbox | `updateMailboxContact` | `PATCH /mailbox/v1/mailboxes/{mailbox}/contacts/{contact}` | `Contact` |
-| **C.113** | mailbox | `deleteMailboxContact` | `DELETE /mailbox/v1/mailboxes/{mailbox}/contacts/{contact}` | 204 |
-| **C.114** | public-control | `searchOrganisationDirectory` | `GET /api/v1/organisation/directory` | `DirectoryEntry`, cursor page |
+| **C.108** | mailbox | `listMailboxThreads` | `GET /api/v1/mailboxes/{mailbox}/threads` | `ThreadSummary`, cursor page |
+| **C.109** | mailbox | `listMailboxContacts` | `GET /api/v1/mailboxes/{mailbox}/contacts` | `Contact`, cursor page |
+| **C.110** | mailbox | `createMailboxContact` | `POST /api/v1/mailboxes/{mailbox}/contacts` | `Contact`, 201 |
+| **C.111** | mailbox | `getMailboxContact` | `GET /api/v1/mailboxes/{mailbox}/contacts/{contact}` | `Contact` |
+| **C.112** | mailbox | `updateMailboxContact` | `PATCH /api/v1/mailboxes/{mailbox}/contacts/{contact}` | `Contact` |
+| **C.113** | mailbox | `deleteMailboxContact` | `DELETE /api/v1/mailboxes/{mailbox}/contacts/{contact}` | 204 |
+| **C.114** | public-control | `searchOrganisationDirectory` | `GET /api/v1/organisations/{org}/directory` | `DirectoryEntry`, cursor page |
 
 ### D-01 — the capability already exists; the endpoint does not
 

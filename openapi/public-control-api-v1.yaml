@@ -10,7 +10,7 @@ info:
   title: "Karyalay Mail — public control API"
   version: 0.3.0
   summary: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions."
-  description: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions.\n\n**Source:** karyalay-mail repository-spec-v1.0 §26-§27, Appendix C.1-C.65 and C.92-C.96.\n**Audience:** Browser and API clients acting for a customer principal.\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 70 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
+  description: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions.\n\n**Source:** karyalay-mail repository-spec-v1.0 §26-§27, Appendix C.1-C.65 and C.92-C.96.\n**Audience:** Browser and API clients acting for a customer principal.\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 71 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
@@ -30,6 +30,8 @@ tags:
     description: "Tenant audit trail (Repo 1 §37.1)."
   - name: Credentials
     description: "App passwords (Repo 1 §17.2)."
+  - name: Directory
+    description: "Bounded organisation directory search for addressable members (D-05, ADR-KEM-010)."
   - name: Domain transfers
     description: "Controlled cross-organisation domain transfer under dual authorization (Repo 1 §10.4)."
   - name: Domains
@@ -3783,6 +3785,66 @@ paths:
           "$ref": "#/components/responses/E500"
         "503":
           "$ref": "#/components/responses/E503"
+  "/api/v1/organisations/{org}/directory":
+    get:
+      operationId: searchOrganisationDirectory
+      summary: Search the organisation directory for addressable members.
+      description: "Search the organisation directory for addressable members.\n\n**Catalog:** Appendix C C.114. **Permission:** `member.view`.\n\n**Notes:** Minimum query length; visibility limited to the caller's organisation; endpoint-specific rate limit; opaque cursor pagination; safe fields only.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      tags:
+        - Directory
+      x-karyalay-catalog-id: C.114
+      x-karyalay-permission: member.view
+      parameters:
+        - name: org
+          in: path
+          required: true
+          description: "Organisation identifier (Master §6.3 `organisation_id`)."
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          required: false
+          description: "Free-text filter. For search operations the value is parsed to a typed AST; raw backend syntax is never interpolated (Repo 1 §21.2)."
+          schema:
+            type: string
+            maxLength: 512
+        - "$ref": "#/components/parameters/Cursor"
+        - "$ref": "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: "A bounded page. There is no fetch-all endpoint (Repo 1 §20.2)."
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - next_cursor
+                properties:
+                  data:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/DirectoryEntry"
+                  next_cursor:
+                    "$ref": "#/components/schemas/Cursor"
+        "401":
+          "$ref": "#/components/responses/E401"
+        "403":
+          "$ref": "#/components/responses/E403"
+        "404":
+          "$ref": "#/components/responses/E404"
+        "422":
+          "$ref": "#/components/responses/E422"
+        "429":
+          "$ref": "#/components/responses/E429"
+        "500":
+          "$ref": "#/components/responses/E500"
+        "503":
+          "$ref": "#/components/responses/E503"
 components:
   schemas:
     ValidationError:
@@ -3807,6 +3869,29 @@ components:
         - string
         - "null"
       description: "Opaque pagination cursor. Clients do not construct, parse or reorder cursors (Master §20.4, Repo 1 §26)."
+    DirectoryEntry:
+      type: object
+      description: "One addressable member of the caller's organisation. Deliberately narrower than Member: an autocomplete needs a name and an address, and every field not returned is a field that cannot leak (D-05, ADR-KEM-010)."
+      properties:
+        member_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+          maxLength: 255
+        primary_address:
+          type: string
+          format: idn-email
+        role:
+          oneOf:
+            - type: string
+              maxLength: 64
+            - type: "null"
+      required:
+        - member_id
+        - display_name
+        - primary_address
+      "$comment": "Source: Repo 1 Appendix A.2 organisation_memberships; delta D-05 accepted by ADR-KEM-010. Withheld: entitlements, membership dates and role history -- a directory autocomplete has no use for them and they widen the blast radius of an enumeration"
     Restriction:
       type: object
       description: "An effective restriction. Reason detail is privacy filtered (C.96 notes)."
