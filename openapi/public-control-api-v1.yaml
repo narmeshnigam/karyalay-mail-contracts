@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — public control API"
-  version: 0.3.0
+  version: 0.4.0
   summary: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions."
-  description: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions.\n\n**Source:** karyalay-mail repository-spec-v1.0 §26-§27, Appendix C.1-C.65 and C.92-C.96.\n**Audience:** Browser and API clients acting for a customer principal.\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 71 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
+  description: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions.\n\n**Source:** karyalay-mail repository-spec-v1.0 §26-§27, Appendix C.1-C.65 and C.92-C.96.\n**Audience:** Browser and API clients acting for a customer principal.\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 72 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.3.0
+  x-karyalay-contract-version: 0.4.0
 servers:
   - url: https://api.mail.karyalay.in
     description: Production.
@@ -3845,6 +3845,41 @@ paths:
           "$ref": "#/components/responses/E500"
         "503":
           "$ref": "#/components/responses/E503"
+  "/api/v1/me/session":
+    get:
+      operationId: getMySession
+      summary: "Return the authenticated session: subject, organisation, authorized mailboxes, permissions, locale and server clock."
+      description: "Return the authenticated session: subject, organisation, authorized mailboxes, permissions, locale and server clock.\n\n**Catalog:** Appendix C C.115. **Permission:** `authenticated`.\n\n**Notes:** Bootstrap read (Repo 2 Appendix F AppBootstrap). Mailboxes limited to those this session may act on, including delegated. No secrets, no tokens; server clock included because the client's is unreliable.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      tags:
+        - Sessions
+      x-karyalay-catalog-id: C.115
+      x-karyalay-permission: authenticated
+      responses:
+        "200":
+          description: Success.
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/RequestId"
+            ETag:
+              "$ref": "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Session"
+        "401":
+          "$ref": "#/components/responses/E401"
+        "403":
+          "$ref": "#/components/responses/E403"
+        "404":
+          "$ref": "#/components/responses/E404"
+        "422":
+          "$ref": "#/components/responses/E422"
+        "429":
+          "$ref": "#/components/responses/E429"
+        "500":
+          "$ref": "#/components/responses/E500"
+        "503":
+          "$ref": "#/components/responses/E503"
 components:
   schemas:
     ValidationError:
@@ -3864,6 +3899,69 @@ components:
         - field
         - code
       "$comment": "Source: Repo 1 §26.1."
+    Session:
+      type: object
+      description: "The authenticated session. The bootstrap read Repo 2 Appendix F's AppBootstrap machine needs to reach READY, assembled from state this service already holds (ADR-KEM-011)."
+      properties:
+        subject:
+          type: string
+          maxLength: 255
+          description: OIDC subject.
+        organisation_id:
+          type: string
+          format: uuid
+        mailboxes:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SessionMailbox"
+          maxItems: 256
+          description: "Every mailbox this session may act on, owned and delegated. Repo 2 §18 makes this exactly the mailbox switcher's contents, so a short list is a smaller switcher and never a hidden mailbox."
+        permissions:
+          type: array
+          items:
+            type: string
+            maxLength: 64
+          maxItems: 256
+          description: "Effective permission codes. Advisory for rendering only: §18 recomputes the five-factor decision per request, so a client may never treat presence here as authorisation."
+        locale:
+          type: string
+          maxLength: 35
+          description: BCP 47 language tag.
+        server_time:
+          type: string
+          format: date-time
+        capabilities:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: Server-authoritative feature availability. A capability absent from this map reads as off.
+      required:
+        - subject
+        - organisation_id
+        - mailboxes
+        - permissions
+        - locale
+        - server_time
+        - capabilities
+      "$comment": "Source: Repo 2 §7 and Appendix F; delta accepted by ADR-KEM-011. Withheld: tokens, refresh material and any credential -- §17.2's CREDENTIAL INVARIANT; a bootstrap read is the most-fetched route in the client"
+    SessionMailbox:
+      type: object
+      description: One mailbox this session may act on.
+      properties:
+        mailbox_ref:
+          type: string
+          description: Opaque mailbox reference usable on the C.66-C.114 mailbox routes.
+        address:
+          type: string
+          format: idn-email
+        delegated:
+          type: boolean
+          description: "True when access comes from an access grant (C.34-C.36) rather than ownership."
+      required:
+        - mailbox_ref
+        - address
+        - delegated
+      "$comment": "Source: Repo 1 Appendix A.17 mailbox_access_grants; delta accepted by ADR-KEM-011."
     Cursor:
       type:
         - string

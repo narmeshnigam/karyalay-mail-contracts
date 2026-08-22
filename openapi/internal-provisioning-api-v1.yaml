@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — internal provisioning API"
-  version: 0.3.0
+  version: 0.4.0
   summary: "The desired-state and observation exchange with karyalay-mail-infra, plus service liveness, readiness and version."
   description: "The desired-state and observation exchange with karyalay-mail-infra, plus service liveness, readiness and version.\n\n**Source:** karyalay-mail repository-spec-v1.0 §29, Appendix C.97-C.100 and C.105-C.107; karyalay-mail-infra §48-§51.\n**Audience:** karyalay-mail-infra service identities. Not a public route; a user access token with the wrong audience or client is rejected (Repo 1 §29.2).\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 7 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.3.0
+  x-karyalay-contract-version: 0.4.0
 servers:
   - url: https://internal.mail.karyalay.in
     description: Production.

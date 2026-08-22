@@ -18,7 +18,7 @@
 # referenced here only as the target of customer records.
 
 contract: karyalay-mail-contracts/dns
-contract_version: 0.3.0
+contract_version: 0.4.0
 sources:
   onboarding: Karyalay Email Master Architecture & Integration Contract v1.0 §12
   naming_baseline: Karyalay Email Master Architecture & Integration Contract v1.0 Appendix F

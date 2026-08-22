@@ -148,6 +148,8 @@ OPS = {
     "C.112": dict(doc=MAILBOX, op="updateMailboxContact", req="ContactWrite", res="Contact"),
     "C.113": dict(doc=MAILBOX, op="deleteMailboxContact", status=204),
     "C.114": dict(doc=PUBLIC, op="searchOrganisationDirectory", res="DirectoryEntry", list=True),
+    # --- session bootstrap, accepted by ADR-KEM-011 ----------------------
+    "C.115": dict(doc=PUBLIC, op="getMySession", res="Session"),
 }
 
 # Query parameters that a card's Notes name explicitly. Nothing is added that a

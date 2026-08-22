@@ -2,11 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **PROPOSED** |
+| Status | **ACCEPTED** |
 | Date | 2026-08-22 |
 | Raised by | Repo 2 Wave 4 build (T00.05, T04.01, T04.02) |
-| Affects | Repo 1 Appendix C; Repo 2 §7, Appendix F, Appendix G; contracts `v0.3.0` → `v0.4.0` |
-| Approvers | — awaiting programme owner |
+| Affects | Repo 1 Appendix C (114 → 115); Repo 2 §7, Appendix F, Appendix G; contracts `v0.3.0` → `v0.4.0` |
+| Approvers | Programme owner — accepted 2026-08-22 |
 
 ## The finding
 
@@ -66,11 +66,21 @@ It belongs in the **public-control** document, beside C.61/C.62 under a `Session
 
 **Defer to Wave 5 with D-02/D-03/D-07/D-13.** Those four block features. This one blocks a state machine the whole client is built on, and every phase built without it accumulates more code shaped around its absence.
 
-## Consequences if accepted
+## Consequences
 
-`v0.4.0`, additive. One Appendix C card (C.115), one schema, one endpoint in Repo 1 reading tables it already owns. Repo 2's T00.05 becomes automatable, T04.01's ledger becomes a cache rather than the source, and forwarding's loop check gets its comparison set.
+`v0.4.0`, additive, tagged 2026-08-22. **C.115 `GET /api/v1/me/session` → `Session`**, with `SessionMailbox` for the switcher entries. One endpoint in Repo 1 reading tables it already owns. Repo 2's T00.05 becomes automatable, T04.01's ledger becomes a cache rather than the source, and forwarding's loop check gets its comparison set.
 
-If **not** accepted, record why against A001–A005 so the next reader does not rediscover this — Repo 2 cannot close those criteria and should stop carrying them as outstanding.
+Two members carry guards worth stating, because both are places a client could
+reasonably get it wrong:
+
+**`permissions` is advisory.** §18 recomputes its five-factor decision on every
+request against live state, so a client may never treat a code's presence here
+as authorisation — only as a reason to render a control. A token minted before
+a grant was revoked must not be able to open a mailbox the server would refuse.
+
+**Nothing credential-bearing is returned.** No token, no refresh material. §17.2's
+CREDENTIAL INVARIANT applies with unusual force here because a bootstrap read is
+the most-fetched route in the client and the one most likely to end up in a log.
 
 ## Related
 

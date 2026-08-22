@@ -935,6 +935,45 @@ SCHEMAS = {
         "Repo 1 Appendix A.2 organisation_memberships; delta D-05 accepted by ADR-KEM-010",
         "entitlements, membership dates and role history -- a directory autocomplete has no use for them and they widen the blast radius of an enumeration",
     ),
+    "SessionMailbox": _obj(
+        "One mailbox this session may act on.",
+        {
+            "mailbox_ref": {"type": "string", "description": "Opaque mailbox reference usable on the C.66-C.114 mailbox routes."},
+            "address": {"type": "string", "format": "idn-email"},
+            "delegated": {"type": "boolean", "description": "True when access comes from an access grant (C.34-C.36) rather than ownership."},
+        },
+        ["mailbox_ref", "address", "delegated"],
+        "Repo 1 Appendix A.17 mailbox_access_grants; delta accepted by ADR-KEM-011",
+    ),
+    "Session": _obj(
+        "The authenticated session. The bootstrap read Repo 2 Appendix F's AppBootstrap machine needs to reach READY, assembled from state this service already holds (ADR-KEM-011).",
+        {
+            "subject": {"type": "string", "maxLength": 255, "description": "OIDC subject."},
+            "organisation_id": UUID,
+            "mailboxes": {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/SessionMailbox"},
+                "maxItems": 256,
+                "description": "Every mailbox this session may act on, owned and delegated. Repo 2 §18 makes this exactly the mailbox switcher's contents, so a short list is a smaller switcher and never a hidden mailbox.",
+            },
+            "permissions": {
+                "type": "array",
+                "items": {"type": "string", "maxLength": 64},
+                "maxItems": 256,
+                "description": "Effective permission codes. Advisory for rendering only: §18 recomputes the five-factor decision per request, so a client may never treat presence here as authorisation.",
+            },
+            "locale": {"type": "string", "maxLength": 35, "description": "BCP 47 language tag."},
+            "server_time": TS,
+            "capabilities": {
+                "type": "object",
+                "additionalProperties": {"type": "boolean"},
+                "description": "Server-authoritative feature availability. A capability absent from this map reads as off.",
+            },
+        },
+        ["subject", "organisation_id", "mailboxes", "permissions", "locale", "server_time", "capabilities"],
+        "Repo 2 §7 and Appendix F; delta accepted by ADR-KEM-011",
+        "tokens, refresh material and any credential -- \u00a717.2's CREDENTIAL INVARIANT; a bootstrap read is the most-fetched route in the client",
+    ),
     "SearchResult": _obj(
         "Search results. The query is parsed to a typed AST; raw backend syntax is never interpolated (C.81 notes).",
         {

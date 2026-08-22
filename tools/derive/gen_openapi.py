@@ -121,6 +121,7 @@ TAG_BY_PREFIX = [
     ("/api/v1/groups", "Groups"),
     ("/api/v1/mailbox-identities", "Identities"),
     ("/api/v1/me/mail-sessions", "Sessions"),
+    ("/api/v1/me/session", "Sessions"),
     ("/api/v1/mailboxes/{mailbox}/identities", "Identities"),
     ("/api/v1/mailboxes/{mailbox}/access-grants", "Access grants"),
     ("/api/v1/mailboxes/{mailbox}/app-passwords", "Credentials"),
@@ -447,7 +448,7 @@ def build_operation(card, binding, catalog_codes):
     #
     # The structured `Idempotency` row carries the class rule -- "Required for
     # POST create/final-send/provisioning/restriction operations" -- but it is
-    # byte-identical boilerplate on all 114 cards, so it says which *classes*
+    # byte-identical boilerplate on all 115 cards, so it says which *classes*
     # need a key without saying which class a given operation is in. The Notes
     # line is where a card declares that, and it does so in prose.
     #
@@ -680,8 +681,8 @@ def build_document(doc_key, cards, catalog):
 def main():
     catalog = load_error_catalog()
     cards = parse_cards()
-    if len(cards) != 114:
-        sys.exit("Appendix C parsed to %d cards; the appendix preamble states 114" % len(cards))
+    if len(cards) != 115:
+        sys.exit("Appendix C parsed to %d cards; the appendix preamble states 115" % len(cards))
 
     missing = sorted(set(c["id"] for c in cards) - set(OPS))
     if missing:
@@ -718,8 +719,8 @@ def main():
                     }
                 )
 
-    if total != 114:
-        sys.exit("emitted %d operations; expected 114" % total)
+    if total != 115:
+        sys.exit("emitted %d operations; expected 115" % total)
 
     reconciliation.sort(key=lambda r: int(r["catalog_id"].split(".")[1]))
     specmd.write_yaml(
@@ -728,7 +729,7 @@ def main():
             "contract": "karyalay-mail-contracts/openapi",
             "contract_version": CONTRACT_VERSION,
             "source": "karyalay-mail repository-spec-v1.0 Appendix C",
-            "declared_operation_count": 114,
+            "declared_operation_count": 115,
             "emitted_operation_count": total,
             "public_surface_count": sum(1 for r in reconciliation if r["catalog_id"] in ["C.%d" % n for n in list(range(1, 66)) + list(range(92, 97))]),
             "operations": reconciliation,
