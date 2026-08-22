@@ -532,6 +532,31 @@ The complete set. Everything not listed here is independent.
 | Repo 3 **T07.04, T07.08** | proven fencing capability | none — else publish single-node RPO/RTO |
 | Repo 3 **Phase 5** *testing* | **Hetzner TCP/25 egress (AK-01)** | none — see §6 |
 | Repo 2 delta features (D-11/12/14/15) | contract acceptance of the delta | ✅ ship flagged OFF (§60 permits) |
+| Repo 2 **T01.09** (D-01), **T04.05** (D-04), **T04.06** (D-05) | contract acceptance **and** a Repo 1 endpoint | none — see below |
+| Repo 2 **T05.02** (D-02), **T05.03** (D-13), **T05.04** (D-03), **T05.05** (D-07) | contract acceptance **and** a Repo 1 endpoint | none — see below |
+
+**Seven Repo 2 tasks are blocked on unapproved deltas, and until 2026-08-22 this
+matrix recorded none of them.** The row above them named D-11/12/14/15 — four
+deltas that block no task at all — and offered "ship flagged OFF" as the escape
+hatch. That hatch is real for those four, because each degrades to a working
+fallback inside webmail. **It does not apply to the seven below it.** A feature
+flag cannot be turned on against an endpoint that does not exist, and Appendix N's
+governance is explicit that the deltas are "not authorization for Agent 2 to
+invent production APIs."
+
+Six of the seven are owned by **karyalay-mail** (D-05 by identity/directory plus
+the mail gateway), so acceptance is not paperwork: it is an OpenAPI change, a
+contracts version bump past `v0.2.1`, re-pinning in four consumers, and then an
+endpoint build in Repo 1. Appendix C is exhaustive by invariant, so the route
+cannot exist before the catalog does.
+
+The scheduling consequence is concrete. **Wave 4** loses Repo 2's threaded inbox,
+personal contacts and organisation directory search. **Wave 5** loses four of
+Repo 2's seven Phase 5 tasks — the change feed, browser notifications, spam
+feedback and the remote-image privacy proxy — which is most of what makes that
+phase "live, safety, power" rather than a polish pass. Deferring the decision
+does not defer the cost; it moves it into whichever wave is least able to absorb
+it.
 
 The simulators are deliberate architecture, not workarounds. Repo 1 and Repo 3
 were each specified to be buildable without the other — Repo 3 against synthetic
