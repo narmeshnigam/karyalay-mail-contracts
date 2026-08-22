@@ -69,6 +69,7 @@ proposed ADR with the evidence behind it, and none was silently fixed:
 | [KEM-007](../../docs/adr/ADR-KEM-007-permission-and-role-naming-reconciliation.md) | Permission vocabulary differs from Master Appendix B.1; three platform roles carry no permissions at all | Any work needing `platform_security`, `deliverability_analyst` or `platform_billing` authority |
 | [KEM-008](../../docs/adr/ADR-KEM-008-desired-state-and-observation-shape.md) | Repo 1 §12.2 and Repo 3 §49 describe the desired-state document differently; 3 of Repo 3's 6 readiness values have nowhere to be stored | Repo 1 Phase 6 and Repo 3 Phase 3 implementation |
 | [KEM-009](../../docs/adr/ADR-KEM-009-ops-executor-delta-disposition.md) | All six Repo 4 → Repo 3 executor deltas deferred to `v0.2.0`; AI-12's action envelope sequenced first | Repo 4 Phases 1, 2, 4, 5 — already reflected in BUILD-ORDER §11 |
+| [KEM-010](../../docs/adr/ADR-KEM-010-webmail-delta-acceptance-d01-d04-d05.md) | Seven Repo 2 deltas block tasks and the BUILD-ORDER matrix recorded none of them; D-01/D-04/D-05 accepted as C.108–C.114 in `v0.3.0`, D-02/D-03/D-07/D-13 deferred to a Wave 5 decision | Repo 2 T01.09, T04.05, T04.06 until Repo 1 implements; Repo 2 Phase 5 until the four deferred deltas are decided |
 
 KEM-008 is the one to read before writing code: it names the interface both
 sides describe differently, and `v0.1.0` publishes only one of the two
