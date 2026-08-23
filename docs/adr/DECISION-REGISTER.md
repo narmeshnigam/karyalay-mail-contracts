@@ -14,7 +14,9 @@ details live in the linked ADRs.
 | ADR-KEM-006 | Event envelope follows Master §22.3 (`resource`, `request_id`), not Repo 1 §31.1 (`aggregate`); catalog scope is Repo 1 Appendix D's 45 events; three genuine gaps and three undefined consumer subject families referred to their owners | **PROPOSED 2026-08-18** | Raised by Gate 0 T00.02. Repo 4 must not build consumers against `mail.v1.auth.*`, `mail.v1.delivery.*` or `mail.v1.abuse.*` — nothing publishes them. |
 | ADR-KEM-007 | Permission vocabulary follows Repo 1 Appendix B; role catalog follows Master §10.2/§10.3; `platform_security`, `deliverability_analyst` and `platform_billing` carry no permissions and must not be assigned until Appendix B covers them | **PROPOSED 2026-08-18** | Raised by Gate 0 T00.03. `deliverability_analyst` has an immediate consequence: the deliverability workstream is live now with no permission behind it. |
 | ADR-KEM-008 | Desired-state and observation shapes: adopt the Repo 1 ⊎ Repo 3 union in `v0.2.0` (`schema_version`, `resource_id`, `desired_generation`, `desired_status`, `dependencies`, `spec` nesting, six-value readiness + `ABSENT`, `checksum`, and Repo 1's `correlation`) | **PROPOSED 2026-08-18** | Raised by Gate 0 T00.05. **The one to read before writing code.** `v0.1.0` publishes only the Repo 1 side. Items 2, 3, 5 and 7 are shared-breaking; better broken now than at integration. |
-| ADR-KEM-009 | All six Repo 4 → Repo 3 executor deltas (AI-04..AI-09) deferred to `v0.2.0`, with AI-12's canonical action envelope sequenced first | **PROPOSED 2026-08-18** | Raised by Gate 0 T00.06. Repo 3 Appendix AB forbids publishing a speculative production API, so none could be authored in `v0.1.0`. Consistent with ADR-OPS-022 and BUILD-ORDER §11 finding 2. |
+| ADR-KEM-009 | All six Repo 4 → Repo 3 executor deltas (AI-04..AI-09) deferred to `v0.2.0`, with AI-12's canonical action envelope sequenced first | **ACCEPTED 2026-08-18** | Raised by Gate 0 T00.06. Repo 3 Appendix AB forbids publishing a speculative production API, so none could be authored in `v0.1.0`. Consistent with ADR-OPS-022 and BUILD-ORDER §11 finding 2. **The deferral target has passed and was never met** — see the note below. |
+| ADR-KEM-010 | Webmail deltas D-01, D-04 and D-05 accepted into the contract as C.108–C.114; D-02, D-03, D-07 and D-13 remain deferred and undecided | **ACCEPTED 2026-08-22** | Published in `v0.3.0`. karyalay-mail serves all seven operations as of 2026-08-22 (`ServedOperationsTest::OUTSTANDING` is empty). The four still-deferred deltas block four Repo 2 Phase 5 tasks, so Wave 5 cannot open its webmail half without deciding them. |
+| ADR-KEM-011 | Session bootstrap endpoint C.115, the Appendix N delta that was never registered | **ACCEPTED 2026-08-22** | Published in `v0.4.0`. Repo 1 Appendix C grows 114 → 115. |
 | OPEN-001 | Calendar/groupware position vs. Workspace/Zoho competition | **OPEN — product decision** | Master §1.3 excludes it from v1. The exclusion is deliberate; the *competitive* consequence is undecided. Needs a product answer before GA pricing, not before Gate 1. |
 | OPEN-002 | PHP-FPM as the streaming path for the mailbox gateway | **OPEN — deferred** | Concern recorded (process-per-request under large attachment streaming). Revisit with load evidence at Gate 2; premature to redesign now. |
 
@@ -94,3 +96,41 @@ a recorded disposition rather than a spec edit:
    Repo 3 ADR-INF-031 (runbook governance), ADR-INF-032 (evidence convention);
    Repo 4 ADR-OPS-019 (stop-the-world independence scenario), ADR-OPS-020
    (runbook governance), ADR-OPS-021 (repository conventions).
+
+## Register correction — 2026-08-24
+
+Three rows were wrong and are fixed above.
+
+- **ADR-KEM-009 read `PROPOSED`**; its ADR file has said `ACCEPTED` since
+  2026-08-18. Repo 4 has been treating it as accepted throughout — its
+  `contracts/PIN.json` cites "ADR-KEM-009 (ACCEPTED 2026-08-18)" as the reason
+  AI-04..AI-09 may be absent from the pinned tag.
+- **ADR-KEM-010 and ADR-KEM-011 were missing entirely**, despite both being
+  ACCEPTED on 2026-08-22 and both having shipped contract changes
+  (`v0.3.0` and `v0.4.0`). A register that omits the two most recent accepted
+  decisions is worse than no register, because it is consulted as complete.
+
+### The ADR-KEM-009 deferral was never honoured, and nothing owns it
+
+ADR-KEM-009 deferred AI-04..AI-09 to **`v0.2.0`**. The contracts repository is
+now at **`v0.4.0`** — three tags past the target — and the six executor deltas
+exist nowhere in it. `grep -rl "AI-04"` returns only this register, the ADR
+itself, `BUILD-ORDER.md` and Gate 0's `T00.06`.
+
+`T00.06` is ☑, and correctly so: its acceptance criterion was to record a
+*disposition*, not to publish the contracts. So the deferral closed a task
+without creating one, and **no task in any repository owns writing them.**
+
+The cost is not theoretical. Ten Repo 4 tasks are ⛔ on this string across
+Phases 1, 2, 4 and 5:
+
+| Phase | Blocked tasks |
+| --- | --- |
+| 01 diagnostics | T01.02, T01.04 |
+| 02 migrations | T02.06, T02.07, T02.08 |
+| 04 backup/recovery | T04.01, T04.02, T04.03 |
+| 05 incidents/changes | T05.03, T05.06 |
+
+Deciding whether `v0.5.0` publishes them — and creating the task that does — is
+the single largest unblocking action available to the programme outside the
+`cp1` deployment.
