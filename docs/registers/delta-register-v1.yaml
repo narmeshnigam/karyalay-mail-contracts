@@ -476,18 +476,26 @@ sources:
         owner: karyalay-mail
         required_contract: Mailbox change feed — authenticated SSE/WebSocket/long-poll with a resumable cursor
         appendix_priority: P1; polling fallback works
-        disposition: DEFERRED
-        deferred_by: ADR-KEM-010
-        deferral_register_entry: D-02
+        disposition: RESOLVED
+        resolved_in: v0.6.0
+        resolved_by: ADR-KEM-015
+        satisfied_by:
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: getMailboxChanges
+            catalog_id: C.116
         blocks: karyalay-webmail Phase 5 T05.02
 
       - id: D-03
         owner: karyalay-mail
         required_contract: Spam/phishing feedback — POST message feedback with classification, idempotency and audit
         appendix_priority: P1
-        disposition: DEFERRED
-        deferred_by: ADR-KEM-010
-        deferral_register_entry: D-03
+        disposition: RESOLVED
+        resolved_in: v0.6.0
+        resolved_by: ADR-KEM-015
+        satisfied_by:
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: reportMessageFeedback
+            catalog_id: C.117
         blocks: karyalay-webmail Phase 5 T05.04
         related: [AI-10]
 
@@ -548,9 +556,13 @@ sources:
         owner: karyalay-mail-infra, karyalay-mail
         required_contract: Remote-image privacy proxy — authenticated proxy token or endpoint, SSRF-safe fetch, redirect/IP/content caps
         appendix_priority: P1 privacy feature; block-only fallback
-        disposition: DEFERRED
-        deferred_by: ADR-KEM-010
-        deferral_register_entry: D-07
+        disposition: RESOLVED
+        resolved_in: v0.6.0
+        resolved_by: ADR-KEM-015
+        satisfied_by:
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: getMessageRemoteContent
+            catalog_id: C.118
         blocks: karyalay-webmail Phase 5 T05.05
 
       - id: D-08
@@ -604,9 +616,16 @@ sources:
         owner: karyalay-mail
         required_contract: Notification/push registration — register/revoke browser push subscription with a minimal payload contract
         appendix_priority: P2
-        disposition: DEFERRED
-        deferred_by: ADR-KEM-010
-        deferral_register_entry: D-13
+        disposition: RESOLVED
+        resolved_in: v0.6.0
+        resolved_by: ADR-KEM-015
+        satisfied_by:
+          - document: openapi/public-control-api-v1.yaml
+            operation_id: registerPushSubscription
+            catalog_id: C.119
+          - document: openapi/public-control-api-v1.yaml
+            operation_id: revokePushSubscription
+            catalog_id: C.120
         blocks: karyalay-webmail Phase 5 T05.03
 
       - id: D-14

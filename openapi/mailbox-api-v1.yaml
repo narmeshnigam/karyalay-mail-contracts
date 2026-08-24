@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — mailbox-user API"
-  version: 0.5.0
+  version: 0.6.0
   summary: "The mailbox data plane served through MailboxBackend and SubmissionGateway: folders, messages, threads, search, drafts, compose attachments and send."
-  description: "The mailbox data plane served through MailboxBackend and SubmissionGateway: folders, messages, threads, search, drafts, compose attachments and send.\n\n**Source:** karyalay-mail repository-spec-v1.0 §28, Appendix C.66-C.91.\n**Audience:** Browser and mobile clients acting for a mailbox principal. Browser clients never receive Dovecot credentials and never connect directly to IMAP or Doveadm (Repo 1 §28).\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 32 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
+  description: "The mailbox data plane served through MailboxBackend and SubmissionGateway: folders, messages, threads, search, drafts, compose attachments and send.\n\n**Source:** karyalay-mail repository-spec-v1.0 §28, Appendix C.66-C.91.\n**Audience:** Browser and mobile clients acting for a mailbox principal. Browser clients never receive Dovecot credentials and never connect directly to IMAP or Doveadm (Repo 1 §28).\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 35 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.5.0
+  x-karyalay-contract-version: 0.6.0
 servers:
   - url: https://api.mail.karyalay.in
     description: Production.
@@ -30,6 +30,8 @@ tags:
     description: "Draft lifecycle with ETag concurrency (Repo 1 §22)."
   - name: Folders
     description: "Mailbox folders, backed by MailboxBackend (Repo 1 §20.1)."
+  - name: Mailboxes
+    description: "Mailbox lifecycle, quota, usage and recovery (Repo 1 §12, §16)."
   - name: Messages
     description: "Message retrieval, mutation and threading (Repo 1 §20, §21.1, §24)."
   - name: Search
@@ -1840,6 +1842,185 @@ paths:
           "$ref": "#/components/responses/E500"
         "503":
           "$ref": "#/components/responses/E503"
+  "/api/v1/mailboxes/{mailbox}/changes":
+    get:
+      operationId: getMailboxChanges
+      summary: "Resumable mailbox change feed: the sequence of folder and message changes since a cursor, so a client refreshes what moved instead of re-listing."
+      description: "Resumable mailbox change feed: the sequence of folder and message changes since a cursor, so a client refreshes what moved instead of re-listing.\n\n**Catalog:** Appendix C C.116. **Permission:** `mailbox:read`.\n\n**Notes:** Long-poll, not SSE or WebSocket. Appendix N D-02 permits any of the three and the catalog's shape decides it: every other operation here is request/response, and an event-stream response would be the only one in Appendix C that no `ServedOperationsTest` could check against a schema. `wait_seconds` bounds the hold; the server returns an empty page at the bound rather than holding indefinitely, so a proxy timeout is never mistaken for a stalled feed. The cursor is opaque and server-minted -- a client-composable cursor is a client-composable query. Delivers change NOTIFICATIONS, never content: a change carries ids, a folder ref and a change kind, so the feed cannot become an unbounded message-body read path.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      tags:
+        - Mailboxes
+      x-karyalay-catalog-id: C.116
+      x-karyalay-permission: mailbox:read
+      parameters:
+        - name: mailbox
+          in: path
+          required: true
+          description: "Mailbox identifier (Master §6.3 `mailbox_id`)."
+          schema:
+            type: string
+            format: uuid
+        - "$ref": "#/components/parameters/Cursor"
+        - "$ref": "#/components/parameters/Limit"
+        - name: wait_seconds
+          in: query
+          required: false
+          description: "How long the server may hold the request waiting for a change. At the bound it returns an empty page rather than holding on, so a timeout is never mistaken for a stall (C.116 notes)."
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 30
+            default: 0
+      responses:
+        "200":
+          description: Success.
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/RequestId"
+            ETag:
+              "$ref": "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/MailboxChangePage"
+        "401":
+          "$ref": "#/components/responses/E401"
+        "403":
+          "$ref": "#/components/responses/E403"
+        "404":
+          "$ref": "#/components/responses/E404"
+        "422":
+          "$ref": "#/components/responses/E422"
+        "429":
+          "$ref": "#/components/responses/E429"
+        "500":
+          "$ref": "#/components/responses/E500"
+        "503":
+          "$ref": "#/components/responses/E503"
+  "/api/v1/mailboxes/{mailbox}/messages/{message}/feedback":
+    post:
+      operationId: reportMessageFeedback
+      summary: "Report a message as spam, not-spam or phishing, for the filter's training and for abuse handling."
+      description: "Report a message as spam, not-spam or phishing, for the filter's training and for abuse handling.\n\n**Catalog:** Appendix C C.117. **Permission:** `mailbox:write`.\n\n**Notes:** Appendix N D-03. Classification is a closed set -- SPAM, NOT_SPAM, PHISHING -- because free-text feedback is a content channel into the filter and into the abuse queue. PHISHING is separate from SPAM rather than a flag on it: they have different urgencies and different downstream owners. Audited: a feedback report can restrict a sender, and §37.1 requires the trail for anything that can. No message content is accepted in the request; the server already has the message and the client sending a copy would put a body in a request log.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      tags:
+        - Messages
+      x-karyalay-catalog-id: C.117
+      x-karyalay-permission: mailbox:write
+      parameters:
+        - name: mailbox
+          in: path
+          required: true
+          description: "Mailbox identifier (Master §6.3 `mailbox_id`)."
+          schema:
+            type: string
+            format: uuid
+        - name: message
+          in: path
+          required: true
+          description: "Opaque, integrity-protected message reference (Repo 1 §20.3)."
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: "Honoured when supplied (Master §20.5)."
+          schema:
+            type: string
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/MessageFeedback"
+      responses:
+        "200":
+          description: Success.
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/MessageFeedbackReceipt"
+        "401":
+          "$ref": "#/components/responses/E401"
+        "403":
+          "$ref": "#/components/responses/E403"
+        "404":
+          "$ref": "#/components/responses/E404"
+        "409":
+          "$ref": "#/components/responses/E409"
+        "413":
+          "$ref": "#/components/responses/E413"
+        "415":
+          "$ref": "#/components/responses/E415"
+        "422":
+          "$ref": "#/components/responses/E422"
+        "429":
+          "$ref": "#/components/responses/E429"
+        "500":
+          "$ref": "#/components/responses/E500"
+        "503":
+          "$ref": "#/components/responses/E503"
+  "/api/v1/mailboxes/{mailbox}/messages/{message}/remote-content":
+    get:
+      operationId: getMessageRemoteContent
+      summary: "Privacy proxy for a remote image referenced by this message: fetch it server-side so the reader's IP address and user agent are never disclosed to the sender."
+      description: "Privacy proxy for a remote image referenced by this message: fetch it server-side so the reader's IP address and user agent are never disclosed to the sender.\n\n**Catalog:** Appendix C C.118. **Permission:** `mailbox:read`.\n\n**Notes:** Appendix N D-07. **The `url` must appear in the named message.** That is the whole safety property and it is what makes this a proxy rather than an open SSRF relay: the server resolves the reference against the message it already stored, so an attacker with a session cannot aim it at an internal address. On top of that, the fetch is SSRF-guarded -- scheme restricted to https, DNS resolution checked against private and link-local ranges after resolution rather than before, redirects bounded and re-checked at every hop, response size and content-type capped, and no request headers forwarded from the caller. A blocked fetch returns a stable Appendix E code and never the remote server's error text, which would otherwise leak whether an internal host exists.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      tags:
+        - Messages
+      x-karyalay-catalog-id: C.118
+      x-karyalay-permission: mailbox:read
+      parameters:
+        - name: mailbox
+          in: path
+          required: true
+          description: "Mailbox identifier (Master §6.3 `mailbox_id`)."
+          schema:
+            type: string
+            format: uuid
+        - name: message
+          in: path
+          required: true
+          description: "Opaque, integrity-protected message reference (Repo 1 §20.3)."
+          schema:
+            type: string
+        - name: url
+          in: query
+          required: true
+          description: "The remote URL to proxy. MUST be one the named message references; the server resolves it against the stored message, which is what makes this a proxy rather than an open relay (C.118 notes)."
+          schema:
+            type: string
+            maxLength: 2048
+      responses:
+        "200":
+          description: "Streamed content, bounded and rendered inline. The response is the remote bytes with no header the caller supplied and none the origin returned beyond content type and length."
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/RequestId"
+            Content-Disposition:
+              description: "inline. A proxied image is displayed, not saved."
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          "$ref": "#/components/responses/E401"
+        "403":
+          "$ref": "#/components/responses/E403"
+        "404":
+          "$ref": "#/components/responses/E404"
+        "422":
+          "$ref": "#/components/responses/E422"
+        "429":
+          "$ref": "#/components/responses/E429"
+        "500":
+          "$ref": "#/components/responses/E500"
+        "503":
+          "$ref": "#/components/responses/E503"
 components:
   schemas:
     ValidationError:
@@ -1859,6 +2040,91 @@ components:
         - field
         - code
       "$comment": "Source: Repo 1 §26.1."
+    MessageFeedbackReceipt:
+      type: object
+      description: "What C.117 returns: that the report was recorded, and nothing about what it will do."
+      properties:
+        recorded_at:
+          type: string
+          format: date-time
+        classification:
+          type: string
+          enum:
+            - SPAM
+            - NOT_SPAM
+            - PHISHING
+      required:
+        - recorded_at
+        - classification
+      "$comment": "Source: Repo 2 Appendix N D-03; accepted by ADR-KEM-015. Withheld: filter scores, reputation values and any downstream consequence -- disclosing them turns the endpoint into an oracle a spammer can tune against"
+    MessageFeedback:
+      type: object
+      description: A C.117 spam/phishing report.
+      properties:
+        classification:
+          type: string
+          enum:
+            - SPAM
+            - NOT_SPAM
+            - PHISHING
+          description: "PHISHING is separate from SPAM rather than a flag on it: the two have different urgencies and different downstream owners, and collapsing them loses the distinction at the point it is cheapest to record."
+      required:
+        - classification
+      "$comment": "Source: Repo 2 Appendix N D-03; accepted by ADR-KEM-015. Withheld: any free-text comment and any copy of the message -- the server already has the message, and a client-supplied copy would put a body into a request log"
+    MailboxChangePage:
+      type: object
+      description: A page of C.116 changes plus the cursor that resumes after them.
+      properties:
+        changes:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MailboxChange"
+          maxItems: 500
+        cursor:
+          type: string
+          maxLength: 512
+          description: "Opaque and server-minted. Pass it to the next call to resume. A client-composable cursor is a client-composable query, and this one addresses a tenant's mailbox."
+        has_more:
+          type: boolean
+          description: True when the page was capped rather than caught up. A client that sees this should poll again immediately instead of waiting.
+      required:
+        - changes
+        - cursor
+        - has_more
+      "$comment": "Source: Repo 2 Appendix N D-02; accepted by ADR-KEM-015."
+    MailboxChange:
+      type: object
+      description: "One change in the C.116 feed. Carries identifiers and a kind, never content -- a change feed that returned message bodies would be an unbounded read path wearing a notification's clothes."
+      properties:
+        kind:
+          type: string
+          enum:
+            - MESSAGE_ADDED
+            - MESSAGE_REMOVED
+            - MESSAGE_FLAGGED
+            - MESSAGE_MOVED
+            - FOLDER_CHANGED
+          description: "What happened. A closed set: an open kind is a contract a client cannot exhaustively handle, so it would branch on the ones it knows and silently ignore the rest."
+        message_ref:
+          type: string
+          maxLength: 255
+          description: Absent for FOLDER_CHANGED.
+        folder_ref:
+          type: string
+          maxLength: 255
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+        - kind
+        - folder_ref
+        - occurred_at
+      "$comment": "Source: Repo 2 Appendix N D-02; accepted by ADR-KEM-015. Withheld: subject, sender, body and every other message field -- this is a notification that something moved, and the client re-reads through the mailbox routes that already enforce §38"
+    Cursor:
+      type:
+        - string
+        - "null"
+      description: "Opaque pagination cursor. Clients do not construct, parse or reorder cursors (Master §20.4, Repo 1 §26)."
     Contact:
       type: object
       description: "A personal contact. Private to the mailbox principal, not shared across the organisation (D-04, ADR-KEM-010)."
@@ -1948,11 +2214,6 @@ components:
       required:
         - addresses
       "$comment": "Source: delta D-04 accepted by ADR-KEM-010."
-    Cursor:
-      type:
-        - string
-        - "null"
-      description: "Opaque pagination cursor. Clients do not construct, parse or reorder cursors (Master §20.4, Repo 1 §26)."
     ThreadSummary:
       type: object
       description: "One thread in a folder or search scope. The list form of the C.80 projection, so a client never re-threads message pages itself (D-01, ADR-KEM-010)."
@@ -2766,74 +3027,6 @@ components:
                 type: array
                 items:
                   "$ref": "#/components/schemas/ValidationError"
-    E409:
-      description: "ADDRESS_ALREADY_IN_USE — Canonical address registry collision. (NON_RETRYABLE)\nAPP_PASSWORD_LIMIT_EXCEEDED — Credential count limit. (NON_RETRYABLE)\nDKIM_KEY_NOT_READY — Key exists but publication/infra not ready. (RETRY_AFTER)\nDKIM_KEY_REVOKED — Revoked key cannot be activated/reused. (NON_RETRYABLE)\nDKIM_ROTATION_IN_PROGRESS — Rotation already active. (RETRY_AFTER)\nDNS_REQUIREMENT_NOT_MET — Required DNS readiness gate is unmet. (NON_RETRYABLE)\nDOMAIN_VERIFICATION_PENDING — Challenge exists but no valid observation yet. (RETRY_AFTER)\nENTITLEMENT_LIMIT_EXCEEDED — Plan/resource limit exceeded. (NON_RETRYABLE)\nFILTER_INSTALLATION_PENDING — Desired filter not observed installed. (RETRY_AFTER)\nFOLDER_PROTECTED — Operation forbidden for protected/special-use folder. (NON_RETRYABLE)\nFORWARDING_TARGET_UNVERIFIED — External target needs verification. (NON_RETRYABLE)\nIDEMPOTENCY_IN_PROGRESS — Original request still executing. (RETRY_AFTER)\nIDEMPOTENCY_KEY_REUSED — Same key used for different canonical request. (NON_RETRYABLE)\nMAILBOX_ALREADY_EXISTS — Primary address/resource conflicts. (NON_RETRYABLE)\nMAILBOX_NOT_ACTIVE — Mailbox state blocks operation. (NON_RETRYABLE)\nMAILBOX_OVER_ENTITLEMENT — Requested quota/mailbox count exceeds entitlement. (NON_RETRYABLE)\nMAIL_DOMAIN_ALREADY_HOSTED — Canonical domain already reserved/hosted. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_ACTIVE — Domain state blocks operation. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_VERIFIED — Ownership not verified. (NON_RETRYABLE)\nMESSAGE_REFERENCE_STALE — UIDVALIDITY/folder generation makes opaque message reference stale. (NON_RETRYABLE)\nORGANISATION_NOT_ACTIVE — Organisation state blocks operation. (NON_RETRYABLE)\nPROVISIONING_IN_PROGRESS — Resource generation not yet ready. (RETRY_AFTER)\nPROVISIONING_STALE_OBSERVATION — Observation older than desired/current generation. (NON_RETRYABLE)\nSUBMISSION_ALREADY_ACCEPTED — Same logical send already accepted; return existing record where API semantics permit. (NON_RETRYABLE)"
-      headers:
-        X-Request-ID:
-          "$ref": "#/components/headers/RequestId"
-      content:
-        application/problem+json:
-          schema:
-            type: object
-            description: "RFC 9457 problem details for HTTP 409. `code` is narrowed to the catalog codes that map to this status."
-            required:
-              - type
-              - title
-              - status
-              - code
-            properties:
-              type:
-                type: string
-                format: uri
-                description: "https://errors.karyalay.in/mail/{code}"
-              title:
-                type: string
-              status:
-                type: integer
-                minimum: 100
-                maximum: 599
-                const: 409
-              code:
-                type: string
-                description: A code from errors/error-catalog-v1.yaml whose default HTTP mapping is 409.
-                enum:
-                  - ADDRESS_ALREADY_IN_USE
-                  - APP_PASSWORD_LIMIT_EXCEEDED
-                  - DKIM_KEY_NOT_READY
-                  - DKIM_KEY_REVOKED
-                  - DKIM_ROTATION_IN_PROGRESS
-                  - DNS_REQUIREMENT_NOT_MET
-                  - DOMAIN_VERIFICATION_PENDING
-                  - ENTITLEMENT_LIMIT_EXCEEDED
-                  - FILTER_INSTALLATION_PENDING
-                  - FOLDER_PROTECTED
-                  - FORWARDING_TARGET_UNVERIFIED
-                  - IDEMPOTENCY_IN_PROGRESS
-                  - IDEMPOTENCY_KEY_REUSED
-                  - MAILBOX_ALREADY_EXISTS
-                  - MAILBOX_NOT_ACTIVE
-                  - MAILBOX_OVER_ENTITLEMENT
-                  - MAIL_DOMAIN_ALREADY_HOSTED
-                  - MAIL_DOMAIN_NOT_ACTIVE
-                  - MAIL_DOMAIN_NOT_VERIFIED
-                  - MESSAGE_REFERENCE_STALE
-                  - ORGANISATION_NOT_ACTIVE
-                  - PROVISIONING_IN_PROGRESS
-                  - PROVISIONING_STALE_OBSERVATION
-                  - SUBMISSION_ALREADY_ACCEPTED
-              detail:
-                type: string
-                description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."
-              request_id:
-                type: string
-                maxLength: 128
-              trace_id:
-                type: string
-                pattern: "^[0-9a-f]{32}$"
-              errors:
-                type: array
-                items:
-                  "$ref": "#/components/schemas/ValidationError"
     E404:
       description: "ALIAS_NOT_FOUND — Alias not found. (NON_RETRYABLE)\nAPP_PASSWORD_NOT_FOUND — Credential not found. (NON_RETRYABLE)\nATTACHMENT_NOT_FOUND — Staged/MIME attachment not found. (NON_RETRYABLE)\nAUTHZ_RESOURCE_NOT_VISIBLE — Use to avoid resource-existence leakage across tenant/security boundary. (NON_RETRYABLE)\nFOLDER_NOT_FOUND — Folder not found/stale ref. (NON_RETRYABLE)\nGROUP_NOT_FOUND — Group not found. (NON_RETRYABLE)\nMAILBOX_NOT_FOUND — Mailbox not visible/found. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_FOUND — Domain resource not visible/found. (NON_RETRYABLE)\nMESSAGE_NOT_FOUND — Message not found. (NON_RETRYABLE)\nORGANISATION_NOT_FOUND — Organisation not visible/found. (NON_RETRYABLE)\nSESSION_NOT_FOUND — Session not found. (NON_RETRYABLE)"
       headers:
@@ -3068,6 +3261,74 @@ components:
                   - MESSAGE_TOO_LARGE
                   - REQUEST_TOO_LARGE
                   - SUBMISSION_MESSAGE_TOO_LARGE
+              detail:
+                type: string
+                description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."
+              request_id:
+                type: string
+                maxLength: 128
+              trace_id:
+                type: string
+                pattern: "^[0-9a-f]{32}$"
+              errors:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/ValidationError"
+    E409:
+      description: "ADDRESS_ALREADY_IN_USE — Canonical address registry collision. (NON_RETRYABLE)\nAPP_PASSWORD_LIMIT_EXCEEDED — Credential count limit. (NON_RETRYABLE)\nDKIM_KEY_NOT_READY — Key exists but publication/infra not ready. (RETRY_AFTER)\nDKIM_KEY_REVOKED — Revoked key cannot be activated/reused. (NON_RETRYABLE)\nDKIM_ROTATION_IN_PROGRESS — Rotation already active. (RETRY_AFTER)\nDNS_REQUIREMENT_NOT_MET — Required DNS readiness gate is unmet. (NON_RETRYABLE)\nDOMAIN_VERIFICATION_PENDING — Challenge exists but no valid observation yet. (RETRY_AFTER)\nENTITLEMENT_LIMIT_EXCEEDED — Plan/resource limit exceeded. (NON_RETRYABLE)\nFILTER_INSTALLATION_PENDING — Desired filter not observed installed. (RETRY_AFTER)\nFOLDER_PROTECTED — Operation forbidden for protected/special-use folder. (NON_RETRYABLE)\nFORWARDING_TARGET_UNVERIFIED — External target needs verification. (NON_RETRYABLE)\nIDEMPOTENCY_IN_PROGRESS — Original request still executing. (RETRY_AFTER)\nIDEMPOTENCY_KEY_REUSED — Same key used for different canonical request. (NON_RETRYABLE)\nMAILBOX_ALREADY_EXISTS — Primary address/resource conflicts. (NON_RETRYABLE)\nMAILBOX_NOT_ACTIVE — Mailbox state blocks operation. (NON_RETRYABLE)\nMAILBOX_OVER_ENTITLEMENT — Requested quota/mailbox count exceeds entitlement. (NON_RETRYABLE)\nMAIL_DOMAIN_ALREADY_HOSTED — Canonical domain already reserved/hosted. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_ACTIVE — Domain state blocks operation. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_VERIFIED — Ownership not verified. (NON_RETRYABLE)\nMESSAGE_REFERENCE_STALE — UIDVALIDITY/folder generation makes opaque message reference stale. (NON_RETRYABLE)\nORGANISATION_NOT_ACTIVE — Organisation state blocks operation. (NON_RETRYABLE)\nPROVISIONING_IN_PROGRESS — Resource generation not yet ready. (RETRY_AFTER)\nPROVISIONING_STALE_OBSERVATION — Observation older than desired/current generation. (NON_RETRYABLE)\nSUBMISSION_ALREADY_ACCEPTED — Same logical send already accepted; return existing record where API semantics permit. (NON_RETRYABLE)"
+      headers:
+        X-Request-ID:
+          "$ref": "#/components/headers/RequestId"
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            description: "RFC 9457 problem details for HTTP 409. `code` is narrowed to the catalog codes that map to this status."
+            required:
+              - type
+              - title
+              - status
+              - code
+            properties:
+              type:
+                type: string
+                format: uri
+                description: "https://errors.karyalay.in/mail/{code}"
+              title:
+                type: string
+              status:
+                type: integer
+                minimum: 100
+                maximum: 599
+                const: 409
+              code:
+                type: string
+                description: A code from errors/error-catalog-v1.yaml whose default HTTP mapping is 409.
+                enum:
+                  - ADDRESS_ALREADY_IN_USE
+                  - APP_PASSWORD_LIMIT_EXCEEDED
+                  - DKIM_KEY_NOT_READY
+                  - DKIM_KEY_REVOKED
+                  - DKIM_ROTATION_IN_PROGRESS
+                  - DNS_REQUIREMENT_NOT_MET
+                  - DOMAIN_VERIFICATION_PENDING
+                  - ENTITLEMENT_LIMIT_EXCEEDED
+                  - FILTER_INSTALLATION_PENDING
+                  - FOLDER_PROTECTED
+                  - FORWARDING_TARGET_UNVERIFIED
+                  - IDEMPOTENCY_IN_PROGRESS
+                  - IDEMPOTENCY_KEY_REUSED
+                  - MAILBOX_ALREADY_EXISTS
+                  - MAILBOX_NOT_ACTIVE
+                  - MAILBOX_OVER_ENTITLEMENT
+                  - MAIL_DOMAIN_ALREADY_HOSTED
+                  - MAIL_DOMAIN_NOT_ACTIVE
+                  - MAIL_DOMAIN_NOT_VERIFIED
+                  - MESSAGE_REFERENCE_STALE
+                  - ORGANISATION_NOT_ACTIVE
+                  - PROVISIONING_IN_PROGRESS
+                  - PROVISIONING_STALE_OBSERVATION
+                  - SUBMISSION_ALREADY_ACCEPTED
               detail:
                 type: string
                 description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."

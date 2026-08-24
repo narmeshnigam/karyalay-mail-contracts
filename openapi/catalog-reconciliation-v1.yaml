@@ -5,10 +5,10 @@
 # if any row's operationId is absent from the document it names.
 
 contract: karyalay-mail-contracts/openapi
-contract_version: 0.5.0
+contract_version: 0.6.0
 source: karyalay-mail repository-spec-v1.0 Appendix C
-declared_operation_count: 115
-emitted_operation_count: 115
+declared_operation_count: 120
+emitted_operation_count: 120
 public_surface_count: 70
 operations:
   - catalog_id: C.1
@@ -699,5 +699,35 @@ operations:
     method: GET
     path: "/api/v1/me/session"
     operation_id: getMySession
+    document: public-control-api-v1.yaml
+    permission: authenticated
+  - catalog_id: C.116
+    method: GET
+    path: "/api/v1/mailboxes/{mailbox}/changes"
+    operation_id: getMailboxChanges
+    document: mailbox-api-v1.yaml
+    permission: mailbox:read
+  - catalog_id: C.117
+    method: POST
+    path: "/api/v1/mailboxes/{mailbox}/messages/{message}/feedback"
+    operation_id: reportMessageFeedback
+    document: mailbox-api-v1.yaml
+    permission: mailbox:write
+  - catalog_id: C.118
+    method: GET
+    path: "/api/v1/mailboxes/{mailbox}/messages/{message}/remote-content"
+    operation_id: getMessageRemoteContent
+    document: mailbox-api-v1.yaml
+    permission: mailbox:read
+  - catalog_id: C.119
+    method: PUT
+    path: "/api/v1/me/push-subscriptions/{subscription}"
+    operation_id: registerPushSubscription
+    document: public-control-api-v1.yaml
+    permission: authenticated
+  - catalog_id: C.120
+    method: DELETE
+    path: "/api/v1/me/push-subscriptions/{subscription}"
+    operation_id: revokePushSubscription
     document: public-control-api-v1.yaml
     permission: authenticated

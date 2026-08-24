@@ -945,6 +945,94 @@ SCHEMAS = {
         ["mailbox_ref", "address", "delegated"],
         "Repo 1 Appendix A.17 mailbox_access_grants; delta accepted by ADR-KEM-011",
     ),
+    # --- Appendix N deltas D-02, D-03, D-07, D-13, accepted by ADR-KEM-015 ---
+    "MailboxChange": _obj(
+        "One change in the C.116 feed. Carries identifiers and a kind, never content -- a change feed that returned message bodies would be an unbounded read path wearing a notification's clothes.",
+        {
+            "kind": {
+                "type": "string",
+                "enum": ["MESSAGE_ADDED", "MESSAGE_REMOVED", "MESSAGE_FLAGGED", "MESSAGE_MOVED", "FOLDER_CHANGED"],
+                "description": "What happened. A closed set: an open kind is a contract a client cannot exhaustively handle, so it would branch on the ones it knows and silently ignore the rest.",
+            },
+            "message_ref": {"type": "string", "maxLength": 255, "description": "Absent for FOLDER_CHANGED."},
+            "folder_ref": {"type": "string", "maxLength": 255},
+            "occurred_at": TS,
+        },
+        ["kind", "folder_ref", "occurred_at"],
+        "Repo 2 Appendix N D-02; accepted by ADR-KEM-015",
+        "subject, sender, body and every other message field -- this is a notification that something moved, and the client re-reads through the mailbox routes that already enforce §38",
+    ),
+    "MailboxChangePage": _obj(
+        "A page of C.116 changes plus the cursor that resumes after them.",
+        {
+            "changes": {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/MailboxChange"},
+                "maxItems": 500,
+            },
+            "cursor": {
+                "type": "string",
+                "maxLength": 512,
+                "description": "Opaque and server-minted. Pass it to the next call to resume. A client-composable cursor is a client-composable query, and this one addresses a tenant's mailbox.",
+            },
+            "has_more": {
+                "type": "boolean",
+                "description": "True when the page was capped rather than caught up. A client that sees this should poll again immediately instead of waiting.",
+            },
+        },
+        ["changes", "cursor", "has_more"],
+        "Repo 2 Appendix N D-02; accepted by ADR-KEM-015",
+    ),
+    "MessageFeedback": _obj(
+        "A C.117 spam/phishing report.",
+        {
+            "classification": {
+                "type": "string",
+                "enum": ["SPAM", "NOT_SPAM", "PHISHING"],
+                "description": "PHISHING is separate from SPAM rather than a flag on it: the two have different urgencies and different downstream owners, and collapsing them loses the distinction at the point it is cheapest to record.",
+            },
+        },
+        ["classification"],
+        "Repo 2 Appendix N D-03; accepted by ADR-KEM-015",
+        "any free-text comment and any copy of the message -- the server already has the message, and a client-supplied copy would put a body into a request log",
+    ),
+    "MessageFeedbackReceipt": _obj(
+        "What C.117 returns: that the report was recorded, and nothing about what it will do.",
+        {
+            "recorded_at": TS,
+            "classification": {"type": "string", "enum": ["SPAM", "NOT_SPAM", "PHISHING"]},
+        },
+        ["recorded_at", "classification"],
+        "Repo 2 Appendix N D-03; accepted by ADR-KEM-015",
+        "filter scores, reputation values and any downstream consequence -- disclosing them turns the endpoint into an oracle a spammer can tune against",
+    ),
+    "PushSubscription": _obj(
+        "A C.119 Web Push registration. The transport handle only.",
+        {
+            "endpoint": {
+                "type": "string",
+                "format": "uri",
+                "maxLength": 2048,
+                "description": "The push service's endpoint for this subscription.",
+            },
+            "p256dh": {"type": "string", "maxLength": 255, "description": "Web Push public key (RFC 8291)."},
+            "auth": {"type": "string", "maxLength": 255, "description": "Web Push auth secret (RFC 8291)."},
+        },
+        ["endpoint", "p256dh", "auth"],
+        "Repo 2 Appendix N D-13; accepted by ADR-KEM-015",
+        "anything describing what will be sent -- a push payload traverses a third-party push service, so a notification says a mailbox has new mail and the client fetches the rest over an authenticated channel",
+    ),
+    "PushSubscriptionRecord": _obj(
+        "A registered subscription as the server holds it.",
+        {
+            "subscription_id": {"type": "string", "maxLength": 128},
+            "endpoint": {"type": "string", "format": "uri", "maxLength": 2048},
+            "registered_at": TS,
+        },
+        ["subscription_id", "endpoint", "registered_at"],
+        "Repo 2 Appendix N D-13; accepted by ADR-KEM-015",
+        "p256dh and auth -- they are write-only. Returning them would let a read of this route reconstruct the ability to push to the device.",
+    ),
     "Session": _obj(
         "The authenticated session. The bootstrap read Repo 2 Appendix F's AppBootstrap machine needs to reach READY, assembled from state this service already holds (ADR-KEM-011).",
         {

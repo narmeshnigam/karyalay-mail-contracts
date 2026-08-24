@@ -150,6 +150,15 @@ OPS = {
     "C.114": dict(doc=PUBLIC, op="searchOrganisationDirectory", res="DirectoryEntry", list=True),
     # --- session bootstrap, accepted by ADR-KEM-011 ----------------------
     "C.115": dict(doc=PUBLIC, op="getMySession", res="Session"),
+    # --- Appendix N deltas D-02, D-03, D-07, D-13, accepted by ADR-KEM-015 ---
+    "C.116": dict(doc=MAILBOX, op="getMailboxChanges", res="MailboxChangePage"),
+    "C.117": dict(doc=MAILBOX, op="reportMessageFeedback", req="MessageFeedback", res="MessageFeedbackReceipt"),
+    # No `res`: the response is the image bytes, not JSON. The generator's
+    # binary branch handles it -- a schema here would claim a JSON body the
+    # endpoint never returns.
+    "C.118": dict(doc=MAILBOX, op="getMessageRemoteContent", binary=True, inline=True),
+    "C.119": dict(doc=PUBLIC, op="registerPushSubscription", req="PushSubscription", res="PushSubscriptionRecord"),
+    "C.120": dict(doc=PUBLIC, op="revokePushSubscription", status=204),
 }
 
 # Query parameters that a card's Notes name explicitly. Nothing is added that a
@@ -175,4 +184,10 @@ QUERY = {
     "C.108": ["folder_ref", "q", "cursor", "limit"],
     "C.109": ["q", "cursor", "limit"],
     "C.114": ["q", "cursor", "limit"],
+    # `cursor` resumes; `wait_seconds` bounds the long poll. `limit` is the
+    # page cap.
+    "C.116": ["cursor", "limit", "wait_seconds"],
+    # The URL to proxy. Validated as one this message actually references --
+    # that check is what makes C.118 a proxy rather than an open SSRF relay.
+    "C.118": ["url"],
 }

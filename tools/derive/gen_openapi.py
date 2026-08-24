@@ -83,6 +83,7 @@ TAG_DESCRIPTIONS = {
     "Groups": "Distribution groups and their expansion invariants (Repo 1 §14).",
     "Mailbox settings": "Forwarding, vacation and structured filters (Repo 1 §15).",
     "Sessions": "Mail session visibility and revocation (Repo 1 §17.1, Master §9.5).",
+    "Notifications": "Web Push subscription registration and revocation (C.119-C.120). Transport handles only; a notification never carries message content.",
     "Credentials": "App passwords (Repo 1 §17.2).",
     "Restrictions": "Effective restrictions on a resource (Repo 1 §36).",
     "Audit": "Tenant audit trail (Repo 1 §37.1).",
@@ -122,6 +123,7 @@ TAG_BY_PREFIX = [
     ("/api/v1/mailbox-identities", "Identities"),
     ("/api/v1/me/mail-sessions", "Sessions"),
     ("/api/v1/me/session", "Sessions"),
+    ("/api/v1/me/push-subscriptions", "Notifications"),
     ("/api/v1/mailboxes/{mailbox}/identities", "Identities"),
     ("/api/v1/mailboxes/{mailbox}/access-grants", "Access grants"),
     ("/api/v1/mailboxes/{mailbox}/app-passwords", "Credentials"),
@@ -154,6 +156,7 @@ PARAM_DESCRIPTIONS = {
     "domain": "Hosted domain identifier (Master §6.3 `domain_id`).",
     "mailbox": "Mailbox identifier (Master §6.3 `mailbox_id`).",
     "subject": "OIDC subject of the member.",
+    "subscription": "Client-chosen push subscription identifier (C.119). Client-chosen so that re-registration on every app start is a PUT to a known path rather than a create-then-reconcile.",
     "transfer": "Domain transfer operation identifier.",
     "grant": "Mailbox access grant identifier.",
     "alias": "Alias identifier.",
@@ -177,7 +180,7 @@ PARAM_DESCRIPTIONS = {
     "id": "Resource identifier.",
 }
 
-OPAQUE_PARAMS = {"folder", "message", "part", "thread", "draft"}
+OPAQUE_PARAMS = {"folder", "message", "part", "thread", "draft", "subscription"}
 
 
 def load_error_catalog():
@@ -269,6 +272,19 @@ def query_parameters(cid):
             out.append({"name": "q", "in": "query", "required": False, "description": "Free-text filter. For search operations the value is parsed to a typed AST; raw backend syntax is never interpolated (Repo 1 §21.2).", "schema": {"type": "string", "maxLength": 512}})
         elif name in {"from", "to"}:
             out.append({"name": name, "in": "query", "required": False, "description": "Inclusive RFC 3339 UTC bound on `occurred_at`.", "schema": {"type": "string", "format": "date-time"}})
+        elif name == "wait_seconds":
+            # Bounded, and the bound is the contract rather than a hint. §41's
+            # request budget applies to a long poll like any other request, and
+            # an unbounded hold is a request that a proxy times out instead of
+            # the server answering -- which a client cannot distinguish from a
+            # stalled feed.
+            out.append({"name": "wait_seconds", "in": "query", "required": False, "description": "How long the server may hold the request waiting for a change. At the bound it returns an empty page rather than holding on, so a timeout is never mistaken for a stall (C.116 notes).", "schema": {"type": "integer", "minimum": 0, "maximum": 30, "default": 0}})
+        elif name == "url":
+            # No `format: uri`. The value is validated against the message's own
+            # references, not against a URI grammar -- and declaring a format
+            # the server does not rely on invites a client to think passing the
+            # format is what makes the call succeed.
+            out.append({"name": "url", "in": "query", "required": True, "description": "The remote URL to proxy. MUST be one the named message references; the server resolves it against the stored message, which is what makes this a proxy rather than an open relay (C.118 notes).", "schema": {"type": "string", "maxLength": 2048}})
         elif name == "folder_ref":
             out.append({"name": "folder_ref", "in": "query", "required": False, "description": "Opaque folder reference. Defaults to the INBOX special-use folder (C.70 notes).", "schema": {"type": "string"}})
         elif name.endswith("_id"):
@@ -526,11 +542,23 @@ def build_operation(card, binding, catalog_codes):
 
     if binding.get("binary"):
         media = binding.get("media", "application/octet-stream")
-        success = {
-            "description": "Streamed content. Bounded, with a safe filename and Content-Disposition (C.73, C.74 notes).",
-            "headers": dict(success_headers, **{"Content-Disposition": {"description": "attachment, with a sanitized filename.", "schema": {"type": "string"}}}),
-            "content": {media: {"schema": {"type": "string", "format": "binary"}}},
-        }
+        if binding.get("inline"):
+            # A proxied image is rendered, not saved. `attachment` here would
+            # make every remote image in every message download instead of
+            # display, which is the opposite of the feature -- and the
+            # disposition is the contract, not a hint, because a client cannot
+            # override it.
+            success = {
+                "description": "Streamed content, bounded and rendered inline. The response is the remote bytes with no header the caller supplied and none the origin returned beyond content type and length.",
+                "headers": dict(success_headers, **{"Content-Disposition": {"description": "inline. A proxied image is displayed, not saved.", "schema": {"type": "string"}}}),
+                "content": {media: {"schema": {"type": "string", "format": "binary"}}},
+            }
+        else:
+            success = {
+                "description": "Streamed content. Bounded, with a safe filename and Content-Disposition (C.73, C.74 notes).",
+                "headers": dict(success_headers, **{"Content-Disposition": {"description": "attachment, with a sanitized filename.", "schema": {"type": "string"}}}),
+                "content": {media: {"schema": {"type": "string", "format": "binary"}}},
+            }
     elif status == 204:
         success = {"description": "Deleted. The operation is idempotent: repeating it on an already-absent resource is not an error.", "headers": success_headers}
     elif binding.get("list"):
@@ -678,11 +706,33 @@ def build_document(doc_key, cards, catalog):
     return document, count
 
 
+def declared_operation_count():
+    """The count Appendix C's own preamble states.
+
+    Read rather than hard-coded. It was `115` as a literal here, and adding
+    C.116-C.120 meant the generator refused a spec it should have been checking
+    itself against -- the guard had become a second place to remember the
+    number, which is the failure it exists to prevent.
+    """
+    preamble = specmd.section(
+        specmd.read_spec("repo1"), "Appendix C — Complete Endpoint Catalog"
+    )
+    match = re.search(r"catalog contains (\d+) documented operations", preamble)
+    if match is None:
+        sys.exit("Appendix C's preamble no longer states an operation count")
+    return int(match.group(1))
+
+
 def main():
     catalog = load_error_catalog()
     cards = parse_cards()
-    if len(cards) != 115:
-        sys.exit("Appendix C parsed to %d cards; the appendix preamble states 115" % len(cards))
+    declared = declared_operation_count()
+    if len(cards) != declared:
+        sys.exit(
+            "Appendix C parsed to %d cards; the appendix preamble states %d. "
+            "The preamble and the cards are the same claim written twice, and this "
+            "is the only place they meet." % (len(cards), declared)
+        )
 
     missing = sorted(set(c["id"] for c in cards) - set(OPS))
     if missing:
@@ -719,8 +769,10 @@ def main():
                     }
                 )
 
-    if total != 115:
-        sys.exit("emitted %d operations; expected 115" % total)
+    if total != declared:
+        sys.exit(
+            "emitted %d operations; Appendix C's preamble states %d" % (total, declared)
+        )
 
     reconciliation.sort(key=lambda r: int(r["catalog_id"].split(".")[1]))
     specmd.write_yaml(
@@ -729,7 +781,7 @@ def main():
             "contract": "karyalay-mail-contracts/openapi",
             "contract_version": CONTRACT_VERSION,
             "source": "karyalay-mail repository-spec-v1.0 Appendix C",
-            "declared_operation_count": 115,
+            "declared_operation_count": declared,
             "emitted_operation_count": total,
             "public_surface_count": sum(1 for r in reconciliation if r["catalog_id"] in ["C.%d" % n for n in list(range(1, 66)) + list(range(92, 97))]),
             "operations": reconciliation,

@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — public control API"
-  version: 0.5.0
+  version: 0.6.0
   summary: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions."
-  description: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions.\n\n**Source:** karyalay-mail repository-spec-v1.0 §26-§27, Appendix C.1-C.65 and C.92-C.96.\n**Audience:** Browser and API clients acting for a customer principal.\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 72 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
+  description: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions.\n\n**Source:** karyalay-mail repository-spec-v1.0 §26-§27, Appendix C.1-C.65 and C.92-C.96.\n**Audience:** Browser and API clients acting for a customer principal.\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 74 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.5.0
+  x-karyalay-contract-version: 0.6.0
 servers:
   - url: https://api.mail.karyalay.in
     description: Production.
@@ -50,6 +50,8 @@ tags:
     description: "Mailbox lifecycle, quota, usage and recovery (Repo 1 §12, §16)."
   - name: Members
     description: "Mail-related organisation membership and role assignment (Repo 1 §8, §18)."
+  - name: Notifications
+    description: "Web Push subscription registration and revocation (C.119-C.120). Transport handles only; a notification never carries message content."
   - name: Organisation
     description: "Organisation mail profile and activation state (Repo 1 §8)."
   - name: Restrictions
@@ -3880,6 +3882,105 @@ paths:
           "$ref": "#/components/responses/E500"
         "503":
           "$ref": "#/components/responses/E503"
+  "/api/v1/me/push-subscriptions/{subscription}":
+    put:
+      operationId: registerPushSubscription
+      summary: "Register or replace a browser push subscription for this session's principal."
+      description: "Register or replace a browser push subscription for this session's principal.\n\n**Catalog:** Appendix C C.119. **Permission:** `authenticated`.\n\n**Notes:** Appendix N D-13. The stored subscription is the transport handle only -- endpoint URL and the two Web Push keys -- and never anything about what will be sent. **Notification payloads carry no message content**: a push payload traverses a third-party push service, so the contract is that a notification says a mailbox has new mail and the client fetches the rest over an authenticated channel. Scoped to the principal, not the device: revoking a session revokes what it registered.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      tags:
+        - Notifications
+      x-karyalay-catalog-id: C.119
+      x-karyalay-permission: authenticated
+      parameters:
+        - name: subscription
+          in: path
+          required: true
+          description: "Client-chosen push subscription identifier (C.119). Client-chosen so that re-registration on every app start is a PUT to a known path rather than a create-then-reconcile."
+          schema:
+            type: string
+        - name: If-Match
+          in: header
+          required: false
+          description: "Optimistic concurrency token from the resource's ETag. Honoured when supplied (Master §20.6)."
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PushSubscription"
+      responses:
+        "200":
+          description: Success.
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/RequestId"
+            ETag:
+              "$ref": "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PushSubscriptionRecord"
+        "401":
+          "$ref": "#/components/responses/E401"
+        "403":
+          "$ref": "#/components/responses/E403"
+        "404":
+          "$ref": "#/components/responses/E404"
+        "409":
+          "$ref": "#/components/responses/E409"
+        "412":
+          "$ref": "#/components/responses/E412"
+        "413":
+          "$ref": "#/components/responses/E413"
+        "415":
+          "$ref": "#/components/responses/E415"
+        "422":
+          "$ref": "#/components/responses/E422"
+        "429":
+          "$ref": "#/components/responses/E429"
+        "500":
+          "$ref": "#/components/responses/E500"
+        "503":
+          "$ref": "#/components/responses/E503"
+    delete:
+      operationId: revokePushSubscription
+      summary: Revoke a push subscription.
+      description: "Revoke a push subscription.\n\n**Catalog:** Appendix C C.120. **Permission:** `authenticated`.\n\n**Notes:** Appendix N D-13. Deleting the registration is the whole operation; the browser's own subscription is the client's to unsubscribe. A revoked subscription is deleted rather than tombstoned, because the row is a transport handle and retaining a stale endpoint is a stale credential nobody audits.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      tags:
+        - Notifications
+      x-karyalay-catalog-id: C.120
+      x-karyalay-permission: authenticated
+      parameters:
+        - name: subscription
+          in: path
+          required: true
+          description: "Client-chosen push subscription identifier (C.119). Client-chosen so that re-registration on every app start is a PUT to a known path rather than a create-then-reconcile."
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Deleted. The operation is idempotent: repeating it on an already-absent resource is not an error."
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/RequestId"
+        "401":
+          "$ref": "#/components/responses/E401"
+        "403":
+          "$ref": "#/components/responses/E403"
+        "404":
+          "$ref": "#/components/responses/E404"
+        "409":
+          "$ref": "#/components/responses/E409"
+        "422":
+          "$ref": "#/components/responses/E422"
+        "429":
+          "$ref": "#/components/responses/E429"
+        "500":
+          "$ref": "#/components/responses/E500"
+        "503":
+          "$ref": "#/components/responses/E503"
 components:
   schemas:
     ValidationError:
@@ -3899,6 +4000,47 @@ components:
         - field
         - code
       "$comment": "Source: Repo 1 §26.1."
+    PushSubscriptionRecord:
+      type: object
+      description: A registered subscription as the server holds it.
+      properties:
+        subscription_id:
+          type: string
+          maxLength: 128
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 2048
+        registered_at:
+          type: string
+          format: date-time
+      required:
+        - subscription_id
+        - endpoint
+        - registered_at
+      "$comment": "Source: Repo 2 Appendix N D-13; accepted by ADR-KEM-015. Withheld: p256dh and auth -- they are write-only. Returning them would let a read of this route reconstruct the ability to push to the device."
+    PushSubscription:
+      type: object
+      description: A C.119 Web Push registration. The transport handle only.
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: "The push service's endpoint for this subscription."
+        p256dh:
+          type: string
+          maxLength: 255
+          description: "Web Push public key (RFC 8291)."
+        auth:
+          type: string
+          maxLength: 255
+          description: "Web Push auth secret (RFC 8291)."
+      required:
+        - endpoint
+        - p256dh
+        - auth
+      "$comment": "Source: Repo 2 Appendix N D-13; accepted by ADR-KEM-015. Withheld: anything describing what will be sent -- a push payload traverses a third-party push service, so a notification says a mailbox has new mail and the client fetches the rest over an authenticated channel"
     Session:
       type: object
       description: "The authenticated session. The bootstrap read Repo 2 Appendix F's AppBootstrap machine needs to reach READY, assembled from state this service already holds (ADR-KEM-011)."
@@ -5772,6 +5914,74 @@ components:
                 type: array
                 items:
                   "$ref": "#/components/schemas/ValidationError"
+    E409:
+      description: "ADDRESS_ALREADY_IN_USE — Canonical address registry collision. (NON_RETRYABLE)\nAPP_PASSWORD_LIMIT_EXCEEDED — Credential count limit. (NON_RETRYABLE)\nDKIM_KEY_NOT_READY — Key exists but publication/infra not ready. (RETRY_AFTER)\nDKIM_KEY_REVOKED — Revoked key cannot be activated/reused. (NON_RETRYABLE)\nDKIM_ROTATION_IN_PROGRESS — Rotation already active. (RETRY_AFTER)\nDNS_REQUIREMENT_NOT_MET — Required DNS readiness gate is unmet. (NON_RETRYABLE)\nDOMAIN_VERIFICATION_PENDING — Challenge exists but no valid observation yet. (RETRY_AFTER)\nENTITLEMENT_LIMIT_EXCEEDED — Plan/resource limit exceeded. (NON_RETRYABLE)\nFILTER_INSTALLATION_PENDING — Desired filter not observed installed. (RETRY_AFTER)\nFOLDER_PROTECTED — Operation forbidden for protected/special-use folder. (NON_RETRYABLE)\nFORWARDING_TARGET_UNVERIFIED — External target needs verification. (NON_RETRYABLE)\nIDEMPOTENCY_IN_PROGRESS — Original request still executing. (RETRY_AFTER)\nIDEMPOTENCY_KEY_REUSED — Same key used for different canonical request. (NON_RETRYABLE)\nMAILBOX_ALREADY_EXISTS — Primary address/resource conflicts. (NON_RETRYABLE)\nMAILBOX_NOT_ACTIVE — Mailbox state blocks operation. (NON_RETRYABLE)\nMAILBOX_OVER_ENTITLEMENT — Requested quota/mailbox count exceeds entitlement. (NON_RETRYABLE)\nMAIL_DOMAIN_ALREADY_HOSTED — Canonical domain already reserved/hosted. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_ACTIVE — Domain state blocks operation. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_VERIFIED — Ownership not verified. (NON_RETRYABLE)\nMESSAGE_REFERENCE_STALE — UIDVALIDITY/folder generation makes opaque message reference stale. (NON_RETRYABLE)\nORGANISATION_NOT_ACTIVE — Organisation state blocks operation. (NON_RETRYABLE)\nPROVISIONING_IN_PROGRESS — Resource generation not yet ready. (RETRY_AFTER)\nPROVISIONING_STALE_OBSERVATION — Observation older than desired/current generation. (NON_RETRYABLE)\nSUBMISSION_ALREADY_ACCEPTED — Same logical send already accepted; return existing record where API semantics permit. (NON_RETRYABLE)"
+      headers:
+        X-Request-ID:
+          "$ref": "#/components/headers/RequestId"
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            description: "RFC 9457 problem details for HTTP 409. `code` is narrowed to the catalog codes that map to this status."
+            required:
+              - type
+              - title
+              - status
+              - code
+            properties:
+              type:
+                type: string
+                format: uri
+                description: "https://errors.karyalay.in/mail/{code}"
+              title:
+                type: string
+              status:
+                type: integer
+                minimum: 100
+                maximum: 599
+                const: 409
+              code:
+                type: string
+                description: A code from errors/error-catalog-v1.yaml whose default HTTP mapping is 409.
+                enum:
+                  - ADDRESS_ALREADY_IN_USE
+                  - APP_PASSWORD_LIMIT_EXCEEDED
+                  - DKIM_KEY_NOT_READY
+                  - DKIM_KEY_REVOKED
+                  - DKIM_ROTATION_IN_PROGRESS
+                  - DNS_REQUIREMENT_NOT_MET
+                  - DOMAIN_VERIFICATION_PENDING
+                  - ENTITLEMENT_LIMIT_EXCEEDED
+                  - FILTER_INSTALLATION_PENDING
+                  - FOLDER_PROTECTED
+                  - FORWARDING_TARGET_UNVERIFIED
+                  - IDEMPOTENCY_IN_PROGRESS
+                  - IDEMPOTENCY_KEY_REUSED
+                  - MAILBOX_ALREADY_EXISTS
+                  - MAILBOX_NOT_ACTIVE
+                  - MAILBOX_OVER_ENTITLEMENT
+                  - MAIL_DOMAIN_ALREADY_HOSTED
+                  - MAIL_DOMAIN_NOT_ACTIVE
+                  - MAIL_DOMAIN_NOT_VERIFIED
+                  - MESSAGE_REFERENCE_STALE
+                  - ORGANISATION_NOT_ACTIVE
+                  - PROVISIONING_IN_PROGRESS
+                  - PROVISIONING_STALE_OBSERVATION
+                  - SUBMISSION_ALREADY_ACCEPTED
+              detail:
+                type: string
+                description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."
+              request_id:
+                type: string
+                maxLength: 128
+              trace_id:
+                type: string
+                pattern: "^[0-9a-f]{32}$"
+              errors:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/ValidationError"
     E404:
       description: "ALIAS_NOT_FOUND — Alias not found. (NON_RETRYABLE)\nAPP_PASSWORD_NOT_FOUND — Credential not found. (NON_RETRYABLE)\nATTACHMENT_NOT_FOUND — Staged/MIME attachment not found. (NON_RETRYABLE)\nAUTHZ_RESOURCE_NOT_VISIBLE — Use to avoid resource-existence leakage across tenant/security boundary. (NON_RETRYABLE)\nFOLDER_NOT_FOUND — Folder not found/stale ref. (NON_RETRYABLE)\nGROUP_NOT_FOUND — Group not found. (NON_RETRYABLE)\nMAILBOX_NOT_FOUND — Mailbox not visible/found. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_FOUND — Domain resource not visible/found. (NON_RETRYABLE)\nMESSAGE_NOT_FOUND — Message not found. (NON_RETRYABLE)\nORGANISATION_NOT_FOUND — Organisation not visible/found. (NON_RETRYABLE)\nSESSION_NOT_FOUND — Session not found. (NON_RETRYABLE)"
       headers:
@@ -6006,74 +6216,6 @@ components:
                   - MESSAGE_TOO_LARGE
                   - REQUEST_TOO_LARGE
                   - SUBMISSION_MESSAGE_TOO_LARGE
-              detail:
-                type: string
-                description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."
-              request_id:
-                type: string
-                maxLength: 128
-              trace_id:
-                type: string
-                pattern: "^[0-9a-f]{32}$"
-              errors:
-                type: array
-                items:
-                  "$ref": "#/components/schemas/ValidationError"
-    E409:
-      description: "ADDRESS_ALREADY_IN_USE — Canonical address registry collision. (NON_RETRYABLE)\nAPP_PASSWORD_LIMIT_EXCEEDED — Credential count limit. (NON_RETRYABLE)\nDKIM_KEY_NOT_READY — Key exists but publication/infra not ready. (RETRY_AFTER)\nDKIM_KEY_REVOKED — Revoked key cannot be activated/reused. (NON_RETRYABLE)\nDKIM_ROTATION_IN_PROGRESS — Rotation already active. (RETRY_AFTER)\nDNS_REQUIREMENT_NOT_MET — Required DNS readiness gate is unmet. (NON_RETRYABLE)\nDOMAIN_VERIFICATION_PENDING — Challenge exists but no valid observation yet. (RETRY_AFTER)\nENTITLEMENT_LIMIT_EXCEEDED — Plan/resource limit exceeded. (NON_RETRYABLE)\nFILTER_INSTALLATION_PENDING — Desired filter not observed installed. (RETRY_AFTER)\nFOLDER_PROTECTED — Operation forbidden for protected/special-use folder. (NON_RETRYABLE)\nFORWARDING_TARGET_UNVERIFIED — External target needs verification. (NON_RETRYABLE)\nIDEMPOTENCY_IN_PROGRESS — Original request still executing. (RETRY_AFTER)\nIDEMPOTENCY_KEY_REUSED — Same key used for different canonical request. (NON_RETRYABLE)\nMAILBOX_ALREADY_EXISTS — Primary address/resource conflicts. (NON_RETRYABLE)\nMAILBOX_NOT_ACTIVE — Mailbox state blocks operation. (NON_RETRYABLE)\nMAILBOX_OVER_ENTITLEMENT — Requested quota/mailbox count exceeds entitlement. (NON_RETRYABLE)\nMAIL_DOMAIN_ALREADY_HOSTED — Canonical domain already reserved/hosted. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_ACTIVE — Domain state blocks operation. (NON_RETRYABLE)\nMAIL_DOMAIN_NOT_VERIFIED — Ownership not verified. (NON_RETRYABLE)\nMESSAGE_REFERENCE_STALE — UIDVALIDITY/folder generation makes opaque message reference stale. (NON_RETRYABLE)\nORGANISATION_NOT_ACTIVE — Organisation state blocks operation. (NON_RETRYABLE)\nPROVISIONING_IN_PROGRESS — Resource generation not yet ready. (RETRY_AFTER)\nPROVISIONING_STALE_OBSERVATION — Observation older than desired/current generation. (NON_RETRYABLE)\nSUBMISSION_ALREADY_ACCEPTED — Same logical send already accepted; return existing record where API semantics permit. (NON_RETRYABLE)"
-      headers:
-        X-Request-ID:
-          "$ref": "#/components/headers/RequestId"
-      content:
-        application/problem+json:
-          schema:
-            type: object
-            description: "RFC 9457 problem details for HTTP 409. `code` is narrowed to the catalog codes that map to this status."
-            required:
-              - type
-              - title
-              - status
-              - code
-            properties:
-              type:
-                type: string
-                format: uri
-                description: "https://errors.karyalay.in/mail/{code}"
-              title:
-                type: string
-              status:
-                type: integer
-                minimum: 100
-                maximum: 599
-                const: 409
-              code:
-                type: string
-                description: A code from errors/error-catalog-v1.yaml whose default HTTP mapping is 409.
-                enum:
-                  - ADDRESS_ALREADY_IN_USE
-                  - APP_PASSWORD_LIMIT_EXCEEDED
-                  - DKIM_KEY_NOT_READY
-                  - DKIM_KEY_REVOKED
-                  - DKIM_ROTATION_IN_PROGRESS
-                  - DNS_REQUIREMENT_NOT_MET
-                  - DOMAIN_VERIFICATION_PENDING
-                  - ENTITLEMENT_LIMIT_EXCEEDED
-                  - FILTER_INSTALLATION_PENDING
-                  - FOLDER_PROTECTED
-                  - FORWARDING_TARGET_UNVERIFIED
-                  - IDEMPOTENCY_IN_PROGRESS
-                  - IDEMPOTENCY_KEY_REUSED
-                  - MAILBOX_ALREADY_EXISTS
-                  - MAILBOX_NOT_ACTIVE
-                  - MAILBOX_OVER_ENTITLEMENT
-                  - MAIL_DOMAIN_ALREADY_HOSTED
-                  - MAIL_DOMAIN_NOT_ACTIVE
-                  - MAIL_DOMAIN_NOT_VERIFIED
-                  - MESSAGE_REFERENCE_STALE
-                  - ORGANISATION_NOT_ACTIVE
-                  - PROVISIONING_IN_PROGRESS
-                  - PROVISIONING_STALE_OBSERVATION
-                  - SUBMISSION_ALREADY_ACCEPTED
               detail:
                 type: string
                 description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."

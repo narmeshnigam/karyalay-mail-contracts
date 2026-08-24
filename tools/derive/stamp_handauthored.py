@@ -28,9 +28,27 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 HAND_AUTHORED = (
     "observability/telemetry-contract-v1.yaml",
     "dns/domain-record-contract-v1.yaml",
+    # Added 2026-08-24. This document is hand-authored -- it is not in
+    # gen_openapi's DOCUMENTS -- and nothing stamped it, so its version sat at
+    # whatever release it was last hand-edited in. It read 0.5.0 while every
+    # other artifact moved to 0.6.0, and the only reason that was ever noticed
+    # is that `validate.mjs` checks every OpenAPI document against the pin.
+    #
+    # A hand-authored artifact outside the stamper is an artifact that drifts
+    # once per release and is corrected by hand each time, which is the shape
+    # that eventually stops being corrected.
+    "openapi/infra-executor-api-v1.yaml",
 )
 
+# Two spellings, because the two artifact families disagree and neither is
+# wrong: the contract YAMLs carry `contract_version`, and an OpenAPI document
+# carries `info.version` plus the `x-karyalay-contract-version` extension that
+# `validate.mjs` reads. All three are the same number.
 LINE = re.compile(r"^contract_version:.*$", re.MULTILINE)
+OPENAPI_LINES = (
+    re.compile(r"^(  version: ).*$", re.MULTILINE),
+    re.compile(r"^(  x-karyalay-contract-version: ).*$", re.MULTILINE),
+)
 
 
 def main():
@@ -39,6 +57,26 @@ def main():
         path = os.path.join(ROOT, rel)
         with open(path, encoding="utf-8") as handle:
             body = handle.read()
+
+        if rel.startswith("openapi/"):
+            stamped = body
+            for pattern in OPENAPI_LINES:
+                if not pattern.search(stamped):
+                    sys.exit(
+                        "%s is missing a line this tool stamps (%s). Either it was "
+                        "restructured or it is no longer a versioned artifact; this "
+                        "tool will not guess which." % (rel, pattern.pattern)
+                    )
+                stamped = pattern.sub(lambda m: m.group(1) + CONTRACT_VERSION, stamped, count=1)
+
+            if stamped != body:
+                with open(path, "w", encoding="utf-8") as handle:
+                    handle.write(stamped)
+                changed += 1
+                print("stamped %s -> %s" % (rel, CONTRACT_VERSION))
+            else:
+                print("ok      %s (already %s)" % (rel, CONTRACT_VERSION))
+            continue
 
         if not LINE.search(body):
             sys.exit(
