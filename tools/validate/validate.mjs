@@ -686,6 +686,14 @@ check('no delta relates to an id that does not exist', () => {
   return `${counted} cross-references resolved`
 })
 
+check('every ADR the delta register names exists and is in the decision register', () => {
+  const { problems, counted, unraised } = deltas.auditAdrReferences(deltaRegister, ROOT)
+  if (problems.length) throw new Error(problems.join('\n'))
+  // Printed rather than passed over: a known defect with no ADR raised is the
+  // ADR-KEM-009 shape one level down, and the count should only ever fall.
+  return `${counted} ADR references resolved; ${unraised} known defect(s) with NO ADR raised`
+})
+
 // ------------------------------------------------- negative test
 check('a deliberately broken catalog fails (negative test)', () => {
   const validate = ajv().compile(loadJson('errors/error-catalog-v1.schema.json'))

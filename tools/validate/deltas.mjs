@@ -22,6 +22,8 @@
  *   - every DEFERRED row is in the deferral register and every deferral-register
  *     row is a delta, so the two cannot drift apart
  *   - every id referenced by `related` exists
+ *   - every ADR-KEM-nnn this register names has a file AND a decision-register
+ *     row, so a delta cannot point at a decision that was never written down
  *
  * The appendices remain the authority. Where this register and an appendix
  * disagree, the appendix wins under Master Contract 0.3 and this file is the
@@ -189,4 +191,36 @@ export function summarise(register) {
   const tally = {}
   for (const d of allDeltas(register)) tally[d.disposition] = (tally[d.disposition] || 0) + 1
   return Object.entries(tally).sort().map(([k, v]) => `${k} ${v}`).join(', ')
+}
+
+/**
+ * Every ADR this register names must exist. An `open_defects[].ref` of null is
+ * a finding recorded on purpose -- a known defect with no ADR raised -- and is
+ * left alone; a ref that names an ADR-KEM id which has no file is a dangling
+ * pointer to a decision nobody took.
+ */
+export function auditAdrReferences(register, root) {
+  const problems = []
+  const decisionRegister = fs.readFileSync(path.join(root, 'docs/adr/DECISION-REGISTER.md'), 'utf8')
+  const adrFiles = fs.readdirSync(path.join(root, 'docs/adr'))
+  let counted = 0
+  let unraised = 0
+
+  const checkRef = (where, ref) => {
+    if (ref == null) return
+    if (!/^ADR-KEM-\d+$/.test(ref)) return // external ADRs live in sibling repos
+    counted++
+    if (!adrFiles.some((f) => f.startsWith(ref + '-'))) problems.push(`${where} names ${ref}, which has no file in docs/adr/`)
+    if (!decisionRegister.includes(ref)) problems.push(`${where} names ${ref}, which has no row in DECISION-REGISTER.md`)
+  }
+
+  for (const d of allDeltas(register)) {
+    checkRef(d.id, d.deferred_by)
+    checkRef(d.id, d.resolved_by)
+    for (const defect of d.open_defects || []) {
+      if (defect.ref == null) unraised++
+      checkRef(`${d.id} open defect`, defect.ref)
+    }
+  }
+  return { problems, counted, unraised }
 }
