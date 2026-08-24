@@ -1,7 +1,9 @@
 # Build Order — Karyalay Email
 
 **Created:** 2026-08-18 · **Revised:** 2026-08-18 (audit against the task
-trees — see §11) · **Owner:** Narmesh Nigam · **Companion to:**
+trees — see §11); **2026-08-24** (§4 Wave 1's distribution note superseded in
+place — the remotes exist and the pin names an `https://` source) · **Owner:**
+Narmesh Nigam · **Companion to:**
 [INFRASTRUCTURE-PLAN.md](INFRASTRUCTURE-PLAN.md)
 
 This document answers one question: **in what order do the five repositories get
@@ -305,6 +307,54 @@ the evidence ADR-KEM-001 requires. Record all four.
 > **Repo 4's Phase 0 does not close.** T00.07b blocks on Repo 1 **T07.01**,
 > which is Wave 2 — the table row above saying "all 9 remaining gating tasks"
 > was the loose statement; §4's own prose two paragraphs later has it right.
+
+> **Superseded 2026-08-24 — both halves of that distribution note are stale,
+> and Repo 4's Phase 0 has since closed.** The paragraphs above are left as
+> written because they were true when written and this document records how
+> the programme got here, not only where it stands. What is true now:
+>
+> **1. The remotes exist.** Every one of the five repositories has a GitHub
+> remote under `github.com/narmeshnigam/`, and all five were pushed. "No repo
+> has a git remote" — the premise the `file://` deviation rested on — stopped
+> being true on 2026-08-19.
+>
+> **2. The pin names an `https://` source.** Each consumer's
+> `contracts/PIN.json` carries
+> `source.url: https://github.com/narmeshnigam/karyalay-mail-contracts.git`.
+>
+> **State that precisely, because the shorthand overstates it.**
+> `source.kind` is still `local-clone`, and deliberately: that is how the
+> check *resolves* the tag, since a developer already has a sibling clone and
+> CI checks one out to the same path. When neither is present the check runs
+> in OFFLINE mode and says so, verifying the committed copies against the
+> digests — which catches a hand edit but not a moved tag. Immutability comes
+> from the per-file digest, not from the transport, exactly as the note above
+> predicted. So the transport is no longer the constraint it was; the pin's
+> resolution order is a separate design choice that has not changed.
+>
+> **3. Distribution was proven twice, and the second time is the one that
+> counts.** On **2026-08-20** all five repositories went green on GitHub
+> Actions in the same round — 26 of 26 jobs on runners that had never seen
+> this code, which surfaced ten defects invisible on the machine the code was
+> written on. On **2026-08-24** all four consumers verified in **FULL mode**:
+> the tag fetched and compared, so a moved tag is caught and not only a hand
+> edit. Both rounds are recorded in
+> [docs/evidence/gate-0/CLOSURE.md](evidence/gate-0/CLOSURE.md), whose own
+> 2026-08-18 "not closed on distribution" paragraph carries the same
+> correction.
+>
+> **4. Repo 4's Phase 0 closed on 2026-08-24**, along with every other
+> repository's. Phase 0 is ☑ in all five.
+>
+> **What is still owed, so this correction is not read as an all-clear.**
+> Repo 3 remains pinned to `v0.2.1` while Repos 1 and 2 are on `v0.4.0` and
+> Repo 4 on `v0.5.0`. Gate 0 asks whether each consumer validates against *a*
+> tagged release rather than whether all four share one, so the gate genuinely
+> closes — but the drift is real, unexplained by any ADR, and now worse than
+> when it was first noted: `v0.5.0` carries the AI-04..AI-09 executor contract
+> that **Repo 3 itself must implement**, so Repo 3 is pinned below a release
+> describing its own obligations. Advancing that pin crosses C.108–C.115 as
+> well, which makes it a decision with evidence rather than a chore.
 
 ---
 
