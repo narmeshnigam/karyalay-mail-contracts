@@ -1,0 +1,69 @@
+# Karyalay Mail — Appendix AI executor reconciliation
+#
+# HAND-AUTHORED, and the counterpart to catalog-reconciliation-v1.yaml.
+#
+# That file is generated and reconciles the four Appendix C documents against
+# karyalay-mail's operation catalog. These six operations are NOT Appendix C
+# rows — they are karyalay-mail-ops Appendix AI deltas, authorised by
+# karyalay-mail-infra ADR-INF-038 — so they reconcile against this map instead.
+#
+# Both files exist for the same reason: "no undocumented route may be exposed
+# in production" is only checkable if every document has an exhaustive map, and
+# a document with no map is one where an operation can be added quietly.
+
+contract: karyalay-mail-contracts/openapi
+contract_version: 0.5.0
+source: karyalay-mail-ops repository-spec-v1.0 Appendix AI (AI-04..AI-09)
+authorised_by: karyalay-mail-infra ADR-INF-038; karyalay-mail-contracts ADR-KEM-012
+document: infra-executor-api-v1.yaml
+declared_operation_count: 6
+emitted_operation_count: 6
+
+operations:
+  - catalog_id: AI-04
+    method: POST
+    path: /infra/v1/migration/execute
+    operation_id: executeMigrationStep
+    document: infra-executor-api-v1.yaml
+    mutating: true
+    note: "Discovery/sync/verify via Dovecot migration primitives. No generic doveadm."
+
+  - catalog_id: AI-05
+    method: POST
+    path: /infra/v1/queue/diagnostics
+    operation_id: queueDiagnostics
+    document: infra-executor-api-v1.yaml
+    mutating: conditional
+    note: "INSPECT is a read; HOLD/RELEASE/RETRY are mutations and take the envelope. The only operation whose classification is per request."
+
+  - catalog_id: AI-06
+    method: POST
+    path: /infra/v1/restore/execute
+    operation_id: executeRestore
+    document: infra-executor-api-v1.yaml
+    mutating: true
+    note: "REPLACE requires a human actor; it is the only mode that can destroy mail received after the recovery point."
+
+  - catalog_id: AI-07
+    method: GET
+    path: /infra/v1/health/{component}
+    operation_id: readComponentHealth
+    document: infra-executor-api-v1.yaml
+    mutating: false
+    note: "Read-only by construction — no field on it could ask for a change."
+
+  - catalog_id: AI-08
+    method: GET
+    path: /infra/v1/backup/catalog
+    operation_id: readBackupCatalog
+    document: infra-executor-api-v1.yaml
+    mutating: false
+    note: "The query half of AI-08. The event half already existed as infra.v1.backup.*."
+
+  - catalog_id: AI-09
+    method: POST
+    path: /infra/v1/maintenance/action
+    operation_id: executeMaintenanceAction
+    document: infra-executor-api-v1.yaml
+    mutating: true
+    note: "Drain, restart, validate. Three verbs, chosen from, never described."

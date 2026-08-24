@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/actions/action-envelope-v1.schema.json",
+  "title": "Karyalay canonical action envelope v1",
+  "description": "The envelope every cross-repository MUTATION carries, from Repo 4 Appendix AI row AI-12 and its worked example AP.1. Frozen here so the four action executors (AI-04, AI-05, AI-06, AI-09) share one shape instead of inventing four. Reads deliberately do NOT carry it.",
+  "$comment": "AI-12 is sequenced ahead of AI-04/05/06/09 by ADR-KEM-009: 'Defining four action executors before their shared envelope would produce four incompatible action shapes.' Published in v0.5.0 alongside openapi/infra-executor-api-v1.yaml, which references it rather than restating it. Repo 4's internal/infraclient/envelope.go is the implementation this was reconciled against, field for field.",
+  "type": "object",
+  "required": [
+    "action_id",
+    "idempotency_key",
+    "action_type",
+    "actor_id",
+    "actor_type",
+    "reason_code",
+    "precondition"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUIDv7 minted by the requesting service, stable across retries of the same logical action. It is the join key an operator follows from the request to the audit row to the observed outcome.",
+      "$comment": "v7 rather than v4: the timestamp prefix keeps action rows at the right edge of their primary-key index, and a v4 here means something minted an identifier outside the service's own factory."
+    },
+    "idempotency_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._~-]{1,128}$",
+      "maxLength": 128,
+      "description": "Deduplication key. Replaying the same key with the same body returns the first outcome rather than acting twice.",
+      "$comment": "RFC 3986 UNRESERVED CHARACTERS ONLY, and this pattern is the one field shape that could not be lifted from an existing schema. operations-api-v1.yaml published maxLength with no pattern while karyalay-mail §34.1 rejects everything outside this class -- and rejects it by answering IDEMPOTENCY_KEY_REQUIRED, i.e. reporting a MISSING header to a caller that plainly sent one. Appendix AP.1's own example key, 'case:...:mailbox-lock:v1', contains colons and is refused. Publishing the pattern here is what stops a client following the spec from failing every request permanently for a reason the response misdescribes. Colons are excluded deliberately, so a key that looks like a path or a URN is not treated as one by the next tool that reads it."
+    },
+    "action_type": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+      "maxLength": 64,
+      "description": "What is being requested, as a catalog code rather than free text. AP.1's `action_type`."
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "The principal on whose authority the action is taken: an operator subject or a service identity."
+    },
+    "actor_type": {
+      "type": "string",
+      "enum": ["human", "service"],
+      "description": "Whether the actor is a person or a service.",
+      "$comment": "An enum and not a free string, because two rules depend on telling them apart and neither is expressible if a caller can set this to 'system': service identities are strictly narrower (Repo 4 §9), and a service may not supply a four-eyes approval (AE #19)."
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+      "maxLength": 64,
+      "description": "Why the action is being requested, from the requesting service's reason catalog.",
+      "$comment": "Required on every mutation with no exception. A mutation with no reason is one nobody can explain afterwards, which is precisely what the audit trail exists to prevent -- so it is refused at the envelope rather than discovered during an incident review."
+    },
+    "evidence_refs": {
+      "type": "array",
+      "description": "Opaque references to evidence objects supporting the request.",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "pattern": "^(ev_[0-9a-zA-Z]{1,64}|ops-evidence://[0-9a-f-]{36})$",
+        "maxLength": 96
+      },
+      "$comment": "Bounded to two known shapes rather than left as a string. An unbounded ref is a place to hide a path or a URL that something downstream might fetch, and an evidence reference is exactly the field an attacker would choose for that."
+    },
+    "precondition": {
+      "type": "object",
+      "description": "The version of the world the caller believes it is acting on.",
+      "$comment": "Required, not optional. Without it a request cannot be refused as stale, and two operators working from different views of the world both succeed -- which is OPS-BND-002's precondition rule and the defect T00.07b found unenforceable on C.101/C.102, where neither ETag nor If-Match is defined. At least one of the two fields must be present.",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["observed_generation"] },
+        { "required": ["resource_version"] }
+      ],
+      "properties": {
+        "observed_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The desired-state generation the caller observed. Compared against the current generation; a lower value is stale."
+        },
+        "resource_version": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Opaque version token for resources that carry one instead of a generation."
+        }
+      }
+    },
+    "ttl_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2592000,
+      "description": "How long the effect stands before it lapses or must be reviewed. AP.1's `ttl_seconds`.",
+      "$comment": "Capped at 30 days, which is Repo 4 §27's review deadline expressed as a number. An effect that outlives anybody's memory of asking for it is indistinguishable from a permanent change. Optional because not every action has a meaningful expiry -- a restore does not -- while the reversible restriction actions §27 requires one for must set it."
+    },
+    "trace_id": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "W3C trace correlation, carried through to the far side's logs and events."
+    }
+  },
+  "$defs": {
+    "observed_state": {
+      "type": "object",
+      "title": "Observed state",
+      "description": "AI-12's 'result/observed state' half: what the far side reports the world looks like now. Returned on SUCCESS and on CONFLICT.",
+      "$comment": "Returned on conflict too, and that is the point of it. A 409 carrying no observed state leaves the caller with only its own stale view to retry against, which is how a reconcile-before-retry loop becomes an infinite one (AE #238: '409 -> refresh observed state'). Repo 4's client treats a conflict without observed state as unusable rather than retryable.",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The generation now in effect."
+        },
+        "resource_version": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "The version token now in effect."
+        },
+        "state": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+          "maxLength": 64,
+          "description": "The resource's state, as the far side names it."
+        }
+      }
+    }
+  }
+}

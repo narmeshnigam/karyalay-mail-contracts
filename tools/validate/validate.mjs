@@ -67,8 +67,8 @@ function assertValid(validate, data, what) {
 }
 
 // ---------------------------------------------------------------- 1. parsing
-const yamlFiles = ['openapi', 'errors', 'auth', 'auth/examples', 'observability', 'dns', 'events'].flatMap((d) => listFiles(d, '.yaml'))
-const jsonFiles = ['errors', 'auth', 'auth/examples', 'observability', 'dns', 'events'].flatMap((d) => listFiles(d, '.json'))
+const yamlFiles = ['openapi', 'errors', 'auth', 'auth/examples', 'observability', 'dns', 'events', 'actions'].flatMap((d) => listFiles(d, '.yaml'))
+const jsonFiles = ['errors', 'auth', 'auth/examples', 'observability', 'dns', 'events', 'actions'].flatMap((d) => listFiles(d, '.json'))
 
 check('every YAML artifact parses', () => {
   for (const f of yamlFiles) YAML.parse(read(f))
@@ -81,7 +81,7 @@ check('every JSON artifact parses', () => {
 
 // ------------------------------------------------- 3. schema self-validity
 check('every JSON Schema compiles as draft 2020-12', () => {
-  const schemaFiles = ['events', 'errors', 'auth', 'observability', 'dns'].flatMap((d) => listFiles(d, '.schema.json'))
+  const schemaFiles = ['events', 'errors', 'auth', 'observability', 'dns', 'actions'].flatMap((d) => listFiles(d, '.schema.json'))
   const instance = ajv()
   for (const f of schemaFiles) {
     if (f.endsWith('permissions-v1.schema.json')) continue
@@ -291,7 +291,11 @@ check('OpenAPI operations reconcile 1:1 with Appendix C', () => {
     throw new Error(`Appendix C declares ${recon.declared_operation_count}; documents emit ${recon.emitted_operation_count}`)
   }
   const byDoc = new Map()
-  for (const f of openapiFiles) {
+  // Appendix C documents only. infra-executor-api-v1.yaml holds Appendix AI
+  // deltas, not Appendix C rows, and reconciles against
+  // executor-reconciliation-v1.yaml in the check below. Folding it in here
+  // would make one count cover two catalogs, so neither could be exhaustive.
+  for (const f of openapiFiles.filter((f) => !f.endsWith('infra-executor-api-v1.yaml'))) {
     const doc = loadYaml(f)
     const ids = new Map()
     for (const [p, item] of Object.entries(doc.paths)) {
@@ -315,6 +319,79 @@ check('OpenAPI operations reconcile 1:1 with Appendix C', () => {
   const total = [...byDoc.values()].reduce((n, m) => n + m.size, 0)
   if (total !== recon.operations.length) throw new Error(`documents hold ${total} operations; the reconciliation lists ${recon.operations.length}`)
   return `${total} operations`
+})
+
+check('the executor document reconciles 1:1 with Appendix AI', () => {
+  // The same exhaustiveness property the Appendix C check enforces, applied to
+  // the hand-authored document. A document with no map is one where a seventh
+  // operation can be added quietly, and "the allow-list is closed" would then
+  // be a sentence in a description rather than a fact.
+  const recon = loadYaml('openapi/executor-reconciliation-v1.yaml')
+  const doc = loadYaml('openapi/infra-executor-api-v1.yaml')
+
+  const emitted = new Map()
+  for (const [p, item] of Object.entries(doc.paths)) {
+    for (const [method, op] of Object.entries(item)) {
+      emitted.set(op.operationId, { path: p, method: method.toUpperCase(), catalog: op['x-karyalay-catalog-id'] })
+    }
+  }
+  if (emitted.size !== recon.declared_operation_count) {
+    throw new Error(`document emits ${emitted.size} operations; the map declares ${recon.declared_operation_count}`)
+  }
+  for (const row of recon.operations) {
+    const op = emitted.get(row.operation_id)
+    if (!op) throw new Error(`${row.catalog_id} names operationId ${row.operation_id}, absent from the document`)
+    if (op.catalog !== row.catalog_id) throw new Error(`${row.operation_id} carries catalog id ${op.catalog}, expected ${row.catalog_id}`)
+    if (op.path !== row.path) throw new Error(`${row.catalog_id} path mismatch: ${op.path} vs ${row.path}`)
+    if (op.method !== row.method) throw new Error(`${row.catalog_id} method mismatch: ${op.method} vs ${row.method}`)
+  }
+  return `${emitted.size} executor operations`
+})
+
+check('no operation in the executor document carries a free-text command surface', () => {
+  // The property ADR-INF-038 exists to guarantee, asserted rather than
+  // described. "No generic remote shell" is worth nothing as prose in a
+  // description; here it is a test that fails if anybody adds the field.
+  const doc = loadYaml('openapi/infra-executor-api-v1.yaml')
+  const banned = /^(command|cmd|script|shell|exec|args|argv|query|sql|path|raw|payload)$/i
+  const found = []
+  const walk = (node, trail) => {
+    if (Array.isArray(node)) return node.forEach((v, i) => walk(v, trail))
+    if (!node || typeof node !== 'object') return
+    for (const [k, v] of Object.entries(node)) {
+      if (k === 'properties' && v && typeof v === 'object') {
+        for (const name of Object.keys(v)) if (banned.test(name)) found.push(`${trail}.${name}`)
+      }
+      walk(v, `${trail}.${k}`)
+    }
+  }
+  walk(doc.paths, 'paths')
+  if (found.length) throw new Error(`command-shaped fields present: ${found.join(', ')}`)
+  return 'six operations, no command field'
+})
+
+check('the inlined action envelope matches actions/action-envelope-v1.schema.json', () => {
+  // The OpenAPI document must resolve every $ref locally, so the AI-12 envelope
+  // is transcribed into it rather than referenced out. A transcription that can
+  // drift is two definitions wearing one name, so this compares them field for
+  // field and fails on any difference.
+  const schema = loadJson('actions/action-envelope-v1.schema.json')
+  const doc = loadYaml('openapi/infra-executor-api-v1.yaml')
+  const inlined = doc.components.schemas.ActionEnvelope
+  const strip = (n) => {
+    if (Array.isArray(n)) return n.map(strip)
+    if (!n || typeof n !== 'object') return n
+    return Object.fromEntries(Object.entries(n).filter(([k]) => !['$schema', '$id', '$defs'].includes(k)).map(([k, v]) => [k, strip(v)]))
+  }
+  const a = JSON.stringify(strip(schema))
+  const b = JSON.stringify(strip(inlined))
+  if (a !== b) throw new Error('the inlined envelope has drifted from the schema file; regenerate it rather than editing one side')
+
+  const observed = doc.components.schemas.ObservedState
+  if (JSON.stringify(strip(schema.$defs.observed_state)) !== JSON.stringify(strip(observed))) {
+    throw new Error('the inlined observed_state has drifted from the schema file')
+  }
+  return `${Object.keys(schema.properties).length} envelope fields, matched`
 })
 
 check('no OpenAPI document names an error code the catalog does not define', () => {

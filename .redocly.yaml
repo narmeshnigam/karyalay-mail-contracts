@@ -14,6 +14,8 @@ apis:
     root: openapi/internal-provisioning-api-v1.yaml
   operations:
     root: openapi/operations-api-v1.yaml
+  infra-executor:
+    root: openapi/infra-executor-api-v1.yaml
 
 extends:
   - recommended
