@@ -134,3 +134,26 @@ Phases 1, 2, 4 and 5:
 Deciding whether `v0.5.0` publishes them — and creating the task that does — is
 the single largest unblocking action available to the programme outside the
 `cp1` deployment.
+
+## Gate 0 closed — 2026-08-24
+
+ADR-KEM-001's condition — **all four consumers' CI validates against the tagged
+release** — is met. All four verified in FULL mode on 2026-08-24, meaning the
+tag was fetched and compared rather than the committed copies merely digested:
+
+| Consumer | Tag | Result |
+| --- | --- | --- |
+| `karyalay-mail` | `v0.4.0` | 14 files byte-identical to `ea4ce36` |
+| `karyalay-webmail` | `v0.4.0` | 6 files byte-identical, generated client current |
+| `karyalay-mail-ops` | `v0.4.0` | CI run 32664033271, FULL mode |
+| `karyalay-mail-infra` | `v0.2.1` | 12 files byte-identical to `a5c1135` |
+
+The Gate 0 section above says "Gate 0 is not closed ... none has done so yet".
+That is superseded by this entry.
+
+**Repo 3 sits on `v0.2.1` and the other three on `v0.4.0`.** Gate 0 asks
+whether each consumer validates against *a tagged release*, not whether all
+four share one, so the condition holds. The drift is nonetheless real,
+unexplained by any ADR, and owed a decision: `v0.2.1` → `v0.4.0` crosses
+C.108–C.115, so advancing Repo 3's pin is a change with evidence rather than a
+chore. Recorded here so it is not mistaken for something Gate 0 settled.

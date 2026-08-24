@@ -1,7 +1,7 @@
 ---
 phase: 00
-status: in-progress
-last-updated: 2026-08-18
+status: done
+last-updated: 2026-08-24
 ---
 
 # Phase 00 — Gate 0: contract population
