@@ -1,0 +1,333 @@
+# Karyalay Mail — deferral register
+#
+# HAND-AUTHORED. Every deferral this repository's ADRs have made, in a form a
+# check can read.
+#
+# Why this file exists
+# --------------------
+# ADR-KEM-009 (ACCEPTED 2026-08-18) deferred seven Repo 4 deltas to `v0.2.0`
+# and named a prerequisite ADR in its own decision. No task was created to
+# raise that ADR. `v0.2.0`, `v0.3.0` and `v0.4.0` were then tagged and pushed,
+# and **nothing failed**, because no check compared a deferral's target tag
+# against the version the repository had actually reached. Ten Repo 4 tasks sat
+# blocked for six days on a decision that had already been taken.
+#
+# ADR-KEM-012 recorded that as a process defect rather than an oversight, and
+# named the missing control:
+#
+#   "A deferral needs an owner, not just a target tag. [...] the target tag
+#    passed three times and nothing failed, because no check compares a
+#    deferral's target against the current version."
+#
+# `tools/validate/deferrals.mjs` is that check and this is the data it reads.
+# A deferral that is not in this file is invisible to it, so the register is
+# also checked against the ADR prose that produced it.
+#
+# What a well-formed deferral needs
+# ---------------------------------
+# `target`      — one of `tag:` (comparable against package.json's version),
+#                 `wave:` or `gate:` (not comparable; see the caveat below).
+# `decision_owner` — who takes the decision, not who is waiting for it. The
+#                 ADR-KEM-009 defect was that this was nobody.
+# `owning_task` — the task that raises it. A deferral that closes a task
+#                 without creating one is indistinguishable from a decision not
+#                 to do it.
+#
+# The caveat, stated rather than hidden
+# -------------------------------------
+# Only `target.tag` is machine-comparable. A deferral targeted at a wave or a
+# gate cannot be matured automatically, because neither has a value this
+# repository holds. Those deferrals are counted, printed on every run, and
+# ratcheted by `unassigned_owner_baseline` below — they are not silently
+# passed over. Converting one to a tag target is what makes it enforceable.
+
+schema_version: "1.0.0"
+
+# The version this register is compared against comes from package.json and
+# nowhere else — see tools/derive/version.py for why that rule exists.
+contract_version_source: package.json
+
+# Deferrals whose `decision_owner` is UNASSIGNED. This is a ratchet: the check
+# fails if the count exceeds this number, so a new ownerless deferral cannot be
+# added quietly. It may only be lowered, by assigning an owner.
+unassigned_owner_baseline: 5
+
+deferrals:
+
+  # --------------------------------------------------------------------------
+  # ADR-KEM-009 — the seven that matured unhonoured. Kept in the register after
+  # closure precisely because this is the case the check exists for: at
+  # v0.2.0 it should have failed, and at v0.3.0 and v0.4.0 it should have kept
+  # failing. The fixture in tools/validate/fixtures/ replays exactly this.
+  # --------------------------------------------------------------------------
+
+  - id: AI-12
+    title: Canonical action envelope — action_id, idempotency_key, actor/service, reason_code, evidence refs, precondition version, result/observed state
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target:
+      tag: v0.2.0
+    decision_owner: karyalay-mail-contracts
+    owning_task: null
+    owning_task_missing_reason: >-
+      ADR-KEM-009 sequenced AI-12 as "the v0.2.0 opening item" and created no
+      task to author it. This is the defect ADR-KEM-012 names.
+    status: MISSED_THEN_HONOURED
+    missed_at: [v0.2.0, v0.3.0, v0.4.0]
+    honoured_in: v0.5.0
+    honoured_by: ADR-KEM-012
+    satisfied_by:
+      - schema: actions/action-envelope-v1.schema.json
+        schema_id: https://contracts.karyalay.in/mail/actions/action-envelope-v1.schema.json
+
+  - id: AI-04
+    title: Allow-listed migration executor using Dovecot migration primitives, without generic Doveadm
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target:
+      tag: v0.2.0
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    owning_task_missing_reason: >-
+      ADR-KEM-009 decision 3 required Repo 3 to raise an allow-list extension
+      ADR. Nobody was named and no task was created.
+    prerequisite:
+      ref: ADR-INF-038
+      repository: karyalay-mail-infra
+      raised_on: 2026-08-24
+      note: Raised six days late, by ADR-KEM-012's author rather than by an owner.
+    status: MISSED_THEN_HONOURED
+    missed_at: [v0.2.0, v0.3.0, v0.4.0]
+    honoured_in: v0.5.0
+    honoured_by: ADR-KEM-012
+    satisfied_by:
+      - document: openapi/infra-executor-api-v1.yaml
+        operation_id: executeMigrationStep
+
+  - id: AI-05
+    title: "Allow-listed queue diagnostic/action service: summary, item metadata, scoped hold/release/retry"
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target:
+      tag: v0.2.0
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    owning_task_missing_reason: See AI-04.
+    prerequisite:
+      ref: ADR-INF-038
+      repository: karyalay-mail-infra
+      raised_on: 2026-08-24
+    status: MISSED_THEN_HONOURED
+    missed_at: [v0.2.0, v0.3.0, v0.4.0]
+    honoured_in: v0.5.0
+    honoured_by: ADR-KEM-012
+    satisfied_by:
+      - document: openapi/infra-executor-api-v1.yaml
+        operation_id: queueDiagnostics
+
+  - id: AI-06
+    title: "Mailbox restore executor: stage recovery point, verify, import recovery folder, approved replacement mode"
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target:
+      tag: v0.2.0
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    owning_task_missing_reason: See AI-04.
+    prerequisite:
+      ref: ADR-INF-038
+      repository: karyalay-mail-infra
+      raised_on: 2026-08-24
+    status: MISSED_THEN_HONOURED
+    missed_at: [v0.2.0, v0.3.0, v0.4.0]
+    honoured_in: v0.5.0
+    honoured_by: ADR-KEM-012
+    satisfied_by:
+      - document: openapi/infra-executor-api-v1.yaml
+        operation_id: executeRestore
+
+  - id: AI-07
+    title: Read-only shard/DRBD/fencing/Galera/NATS/OpenBao health endpoint for Ops diagnostics
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target:
+      tag: v0.2.0
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    owning_task_missing_reason: See AI-04.
+    prerequisite:
+      ref: ADR-INF-038
+      repository: karyalay-mail-infra
+      raised_on: 2026-08-24
+    status: MISSED_THEN_HONOURED
+    missed_at: [v0.2.0, v0.3.0, v0.4.0]
+    honoured_in: v0.5.0
+    honoured_by: ADR-KEM-012
+    note: >-
+      ADR-KEM-009 deferred the endpoint only; Ops consumed the Repo 3 §67
+      metrics in the interim, which is sufficient for dashboards and alerting
+      and insufficient for a synchronous diagnostic call.
+    satisfied_by:
+      - document: openapi/infra-executor-api-v1.yaml
+        operation_id: readComponentHealth
+
+  - id: AI-08
+    title: Backup catalog / recovery point and restore-verification events and queries
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target:
+      tag: v0.2.0
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    owning_task_missing_reason: See AI-04.
+    prerequisite:
+      ref: ADR-INF-038
+      repository: karyalay-mail-infra
+      raised_on: 2026-08-24
+    status: MISSED_THEN_HONOURED
+    missed_at: [v0.2.0, v0.3.0, v0.4.0]
+    honoured_in: v0.5.0
+    honoured_by: ADR-KEM-012
+    note: >-
+      Split delta. The event half already existed as infra.v1.backup.*; only
+      the query half was deferred, and only the query half is satisfied here.
+    satisfied_by:
+      - document: openapi/infra-executor-api-v1.yaml
+        operation_id: readBackupCatalog
+
+  - id: AI-09
+    title: "Maintenance typed actions: drain/restart/validate with action_id and preconditions"
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target:
+      tag: v0.2.0
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    owning_task_missing_reason: See AI-04.
+    prerequisite:
+      ref: ADR-INF-038
+      repository: karyalay-mail-infra
+      raised_on: 2026-08-24
+    status: MISSED_THEN_HONOURED
+    missed_at: [v0.2.0, v0.3.0, v0.4.0]
+    honoured_in: v0.5.0
+    honoured_by: ADR-KEM-012
+    satisfied_by:
+      - document: openapi/infra-executor-api-v1.yaml
+        operation_id: executeMaintenanceAction
+
+  # --------------------------------------------------------------------------
+  # ADR-KEM-010 — four webmail deltas deferred to a WAVE, not a tag, and with
+  # no decision owner. These are the ADR-KEM-009 shape, still open. Each has a
+  # blocked consumer task in Repo 2; none has a task that raises the decision.
+  # The distinction is the whole point: a queue of consumers waiting is not an
+  # owner, and BUILD-ORDER Wave 5 cannot open its Repo 2 half without these.
+  # --------------------------------------------------------------------------
+
+  - id: D-02
+    title: Mailbox change feed — authenticated SSE/WebSocket/long-poll with a resumable cursor
+    source: karyalay-webmail Appendix N
+    deferred_by: ADR-KEM-010
+    deferred_on: 2026-08-22
+    target:
+      wave: 5
+    decision_owner: UNASSIGNED
+    owning_task: null
+    blocked_consumers:
+      - karyalay-webmail/tasks/phase-05-live-safety-power/T05.02-change-feed-d02.md
+    status: OPEN
+    note: >-
+      Half-answered already: ADR-KEM-002 established pooled IMAP with a master
+      user, so IDLE is available upstream and the feed is implementable as soon
+      as a canonical endpoint ships. What is missing is the decision, not the
+      capability.
+
+  - id: D-03
+    title: Spam/phishing feedback — POST message feedback with classification, idempotency and audit
+    source: karyalay-webmail Appendix N
+    deferred_by: ADR-KEM-010
+    deferred_on: 2026-08-22
+    target:
+      wave: 5
+    decision_owner: UNASSIGNED
+    owning_task: null
+    blocked_consumers:
+      - karyalay-webmail/tasks/phase-05-live-safety-power/T05.04-spam-feedback-d03.md
+      - karyalay-webmail/tasks/phase-03-send-actions/T03.03-message-actions-bulk.md
+    status: OPEN
+    note: >-
+      Repo 2 ships a Junk move with honest wording in the interim. A folder
+      move is not classifier feedback, so the interim behaviour is correct and
+      the feature is absent, not degraded.
+
+  - id: D-07
+    title: Remote-image privacy proxy — SSRF-safe fetch with redirect/IP/content caps
+    source: karyalay-webmail Appendix N
+    deferred_by: ADR-KEM-010
+    deferred_on: 2026-08-22
+    target:
+      wave: 5
+    decision_owner: UNASSIGNED
+    owning_task: null
+    blocked_consumers:
+      - karyalay-webmail/tasks/phase-05-live-safety-power/T05.05-remote-image-proxy-d07.md
+      - karyalay-webmail/tasks/phase-01-read-mailbox/T01.06-hostile-renderer.md
+    status: OPEN
+    note: Block-only remote images is the interim behaviour and is privacy-safe.
+
+  - id: D-13
+    title: Notification/push registration — register/revoke browser push subscription
+    source: karyalay-webmail Appendix N
+    deferred_by: ADR-KEM-010
+    deferred_on: 2026-08-22
+    target:
+      wave: 5
+    decision_owner: UNASSIGNED
+    owning_task: null
+    blocked_consumers:
+      - karyalay-webmail/tasks/phase-05-live-safety-power/T05.03-browser-notifications-d13.md
+    status: OPEN
+
+  # --------------------------------------------------------------------------
+  # Register-only decisions that are deferrals in substance.
+  # --------------------------------------------------------------------------
+
+  - id: OPEN-002
+    title: PHP-FPM as the streaming path for the mailbox gateway
+    source: karyalay-mail-contracts DECISION-REGISTER
+    deferred_by: DECISION-REGISTER
+    deferred_on: 2026-08-17
+    target:
+      gate: 2
+    decision_owner: UNASSIGNED
+    owning_task: null
+    status: OPEN
+    note: >-
+      "Revisit with load evidence at Gate 2." Nothing produces that load
+      evidence today, and no task collects it, so the trigger cannot fire on
+      its own. ADR-KEM-002 records the same ceiling and explicitly does not
+      address it.
+
+  - id: KEM-003-FENCING
+    title: Mailbox storage HA claim — blocked until fencing capability is published
+    source: ADR-KEM-003
+    deferred_by: ADR-KEM-003
+    deferred_on: 2026-08-17
+    target:
+      gate: 2
+    decision_owner: karyalay-mail-infra
+    owning_task: karyalay-mail-infra/tasks/phase-07-mailbox-shard-ha/T07.08-ha-capability-statement.md
+    status: OPEN
+    note: >-
+      Included as the well-formed counter-example. The target is a gate rather
+      than a tag, so it is not machine-maturable either — but it has a named
+      owner and a named task, which is what ADR-KEM-009's deferrals lacked. The
+      honesty rule is binding in the interim: no fencing proof means
+      single-node with a published RPO/RTO, not a quiet HA claim.

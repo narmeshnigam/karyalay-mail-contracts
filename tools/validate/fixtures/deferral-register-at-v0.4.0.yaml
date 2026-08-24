@@ -1,0 +1,116 @@
+# FIXTURE — not a live register. Do not derive anything from this file.
+#
+# This is the deferral register as it would have read on 2026-08-22, the day
+# `v0.4.0` was tagged: ADR-KEM-009's seven deferrals to `v0.2.0` all still
+# open, three tags after their target, with no owning task on any of them.
+#
+# It exists so the check in deferrals.mjs can be watched failing on the exact
+# situation it was written for. A check nobody has seen fail is a check nobody
+# knows works -- which is the same argument START-HERE 6.4 makes about
+# structural gates, and this repository has already paid for ignoring it once.
+#
+# tools/validate/validate.mjs asserts that auditMaturity() reports exactly
+# seven violations against this file at version 0.4.0, and none of them at
+# 0.1.0 -- because before the target tag, a deferral is not yet a defect.
+
+schema_version: "1.0.0"
+contract_version_source: package.json
+unassigned_owner_baseline: 0
+
+deferrals:
+  - id: AI-12
+    title: Canonical action envelope
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v0.2.0 }
+    decision_owner: karyalay-mail-contracts
+    owning_task: null
+    status: OPEN
+
+  - id: AI-04
+    title: Allow-listed migration executor
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v0.2.0 }
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    status: OPEN
+
+  - id: AI-05
+    title: Allow-listed queue diagnostic/action service
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v0.2.0 }
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    status: OPEN
+
+  - id: AI-06
+    title: Mailbox restore executor
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v0.2.0 }
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    status: OPEN
+
+  - id: AI-07
+    title: Read-only component health endpoint
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v0.2.0 }
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    status: OPEN
+
+  - id: AI-08
+    title: Backup catalog query half
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v0.2.0 }
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    status: OPEN
+
+  - id: AI-09
+    title: Maintenance typed actions
+    source: karyalay-mail-ops Appendix AI
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v0.2.0 }
+    decision_owner: karyalay-mail-infra
+    owning_task: null
+    status: OPEN
+
+  # Two rows the check must NOT flag, so a passing fixture is not a check that
+  # simply flags everything.
+  - id: FIXTURE-NOT-YET-DUE
+    title: A deferral whose target is still ahead of the repository
+    source: fixture
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v9.0.0 }
+    decision_owner: karyalay-mail-contracts
+    owning_task: fixture
+    status: OPEN
+
+  - id: FIXTURE-ALREADY-HONOURED
+    title: A deferral whose target passed and which was actually delivered
+    source: fixture
+    deferred_by: ADR-KEM-009
+    deferred_on: 2026-08-18
+    target: { tag: v0.2.0 }
+    decision_owner: karyalay-mail-contracts
+    owning_task: fixture
+    status: HONOURED
+    honoured_in: v0.2.0
+    honoured_by: ADR-KEM-008
+    satisfied_by:
+      - document: openapi/internal-provisioning-api-v1.yaml
+        operation_id: getResourceDesiredState

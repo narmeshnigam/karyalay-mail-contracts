@@ -12,6 +12,7 @@
  *   6. cross-references resolve: error codes, permissions, roles, record kinds
  *   7. the OpenAPI documents reconcile 1:1 with Appendix C via the C-number map
  *   8. no OpenAPI document names an error code the catalog does not define
+ *   9. no deferral's target tag has passed with the deferred thing absent
  *
  * Exit code is the number of failures, capped at 250.
  */
@@ -22,6 +23,7 @@ import process from 'node:process'
 import YAML from 'yaml'
 import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
+import * as deferrals from './deferrals.mjs'
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..')
 const failures = []
@@ -549,6 +551,85 @@ check('every $ref inside an OpenAPI document resolves', () => {
     walk(doc)
   }
   return `${counted} refs resolved`
+})
+
+// ------------------------------------------- 9. deferrals vs the current tag
+//
+// ADR-KEM-012, "The process lesson": ADR-KEM-009 deferred seven deltas to
+// `v0.2.0`, the target passed three times, and nothing failed because nothing
+// compared a deferral's target against the version the repository had reached.
+// These five checks are that comparison. See tools/validate/deferrals.mjs.
+
+const deferralRegister = deferrals.loadRegister(ROOT)
+const contractVersion = loadJson('package.json').version
+
+check('the deferral register is well-formed', () => {
+  const problems = deferrals.auditShape(deferralRegister)
+  if (problems.length) throw new Error(problems.join('\n'))
+  return `${deferralRegister.deferrals.length} deferrals`
+})
+
+check("no deferral's target tag has passed with the deferred thing absent", () => {
+  const problems = deferrals.auditMaturity(deferralRegister, contractVersion)
+  if (problems.length) throw new Error(problems.join('\n'))
+  const withTag = deferralRegister.deferrals.filter((d) => d.target?.tag).length
+  const blind = deferrals.unmaturable(deferralRegister)
+  // Printed on every run rather than passed over: these are the deferrals no
+  // version comparison can mature, and they are held only by the owner ratchet.
+  return `${withTag} tag-targeted deferrals checked against v${contractVersion}` +
+    (blind.length ? `; ${blind.length} NOT maturable by version (${blind.join(', ')})` : '')
+})
+
+check('every open deferral has an owner, and the ownerless count only falls', () => {
+  const { problems, unassigned } = deferrals.auditOwnership(deferralRegister)
+  if (problems.length) throw new Error(problems.join('\n'))
+  return `${unassigned.length} ownerless, at the declared baseline`
+})
+
+check('every honoured deferral resolves to a real operation or schema', () => {
+  const { problems, resolved } = deferrals.auditArtifacts(deferralRegister, ROOT)
+  if (problems.length) throw new Error(problems.join('\n'))
+  if (resolved === 0) throw new Error('nothing was resolved -- the check found no artifact to verify, which is a bug in the check, not a clean register')
+  return `${resolved} artifacts resolved in their documents`
+})
+
+check('the deferral check fires on ADR-KEM-009 at v0.4.0 (negative test)', () => {
+  const fixture = deferrals.loadRegister(ROOT, 'tools/validate/fixtures/deferral-register-at-v0.4.0.yaml')
+  const shape = deferrals.auditShape(fixture)
+  if (shape.length) throw new Error(`the fixture itself is malformed: ${shape.join('; ')}`)
+
+  // The situation as it actually stood when v0.4.0 was tagged.
+  const atTarget = deferrals.auditMaturity(fixture, '0.4.0')
+  const want = ['AI-04', 'AI-05', 'AI-06', 'AI-07', 'AI-08', 'AI-09', 'AI-12']
+  for (const id of want) {
+    if (!atTarget.some((m) => m.startsWith(`${id} `))) throw new Error(`the check did not fire on ${id} at v0.4.0, which is the whole reason it exists`)
+  }
+  if (atTarget.length !== want.length) {
+    throw new Error(`expected ${want.length} violations at v0.4.0, got ${atTarget.length}:\n${atTarget.join('\n')}`)
+  }
+
+  // ...and it must fire at v0.2.0 too, the tag the deferral actually named.
+  if (deferrals.auditMaturity(fixture, '0.2.0').length !== want.length) {
+    throw new Error('the check did not fire at v0.2.0, the target tag itself')
+  }
+
+  // Before the target, a deferral is not a defect. A check that flags
+  // everything is not a check.
+  const atV1 = deferrals.auditMaturity(fixture, '0.1.0')
+  if (want.some((id) => atV1.some((m) => m.startsWith(`${id} `)))) {
+    throw new Error(`the check flagged a deferral at v0.1.0, before its target had been reached:\n${atV1.join('\n')}`)
+  }
+  // The one thing it must say at v0.1.0 is that a row cannot have been
+  // honoured in a tag that does not exist yet.
+  if (!atV1.some((m) => m.startsWith('FIXTURE-ALREADY-HONOURED') && m.includes('ahead of'))) {
+    throw new Error('the check accepted a deferral honoured in a tag ahead of the current version')
+  }
+
+  // And an honoured row must not be flagged, however far past its target.
+  if (deferrals.auditMaturity(fixture, '0.9.0').some((m) => m.startsWith('FIXTURE-ALREADY-HONOURED'))) {
+    throw new Error('the check flagged a deferral that was delivered on time')
+  }
+  return '7 violations at v0.4.0 and at v0.2.0, none of the seven at v0.1.0'
 })
 
 // ------------------------------------------------- negative test
