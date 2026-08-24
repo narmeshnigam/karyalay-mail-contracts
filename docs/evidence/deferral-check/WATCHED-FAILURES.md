@@ -98,3 +98,66 @@ D-02, D-03, D-07, D-13 — are the ADR-KEM-009 shape exactly: a target with no
 owner, blocking four Repo 2 Phase 5 tasks, with a consumer waiting on each and
 no task anywhere that raises the decision. Converting a wave target to a tag
 target is a decision, not a tooling change, and it is the programme owner's.
+
+---
+
+# Watched failures — the delta register checks
+
+**Date:** 2026-08-24 · **Checks:** `tools/validate/deltas.mjs`, six checks in
+`npm run validate` · Same argument, same discipline.
+
+## 1. A projection that loses an appendix row
+
+`AI-15` was deleted from the register.
+
+```
+FAIL the delta register holds every row its appendices declare
+     repo4-appendix-ai declares 15 rows in Appendix AI and this register
+     holds 14. A projection that can lose a row silently is the defect
+     ADR-KEM-011 found in Appendix N itself.
+```
+
+## 2. A disposition without the evidence that disposition means
+
+`D-09` was flipped from `OPEN` to `RESOLVED` with nothing else changed.
+
+```
+FAIL the delta register validates against its schema
+       /sources/2/deltas/8 must have required property 'resolved_in'
+       /sources/2/deltas/8 must have required property 'resolved_by'
+       /sources/2/deltas/8 must have required property 'satisfied_by'
+```
+
+The schema makes each disposition carry its own obligations: `RESOLVED` needs
+an artifact, `OPEN` needs `absence_evidence` saying what was looked for and not
+found, `PARTIAL` needs a list of what is missing, `DEFERRED` needs a row in the
+deferral register.
+
+## 3. A delta this register invents
+
+`AI-13` was renamed `AI-99`.
+
+```
+FAIL every delta id in the register appears in the appendix it came from
+     repo4-appendix-ai: AI-99 appear in this register and not in
+     docs/spec/repository-spec-v1.0.md
+```
+
+This one only has teeth when the sibling repositories are checked out beside
+this one, which CI does not do. The check says which mode it ran in on every
+run (`repo4-appendix-ai:15 ids matched; repo3-appendix-ab:no-id-column;
+repo2-appendix-n:15 ids matched`) rather than reporting a pass that inspected
+nothing.
+
+## 4. A deferral whose target is enforced by nothing
+
+`D-07`'s `deferral_register_entry` was pointed at an id that does not exist.
+
+```
+FAIL the delta register and the deferral register describe the same deferrals
+     D-07 is DEFERRED and points at deferral-register entry D-77, which does
+     not exist -- so its target is enforced by nothing
+```
+
+The linkage is checked in both directions, so a deferral cannot exist without a
+delta and a delta cannot be DEFERRED without a deferral.

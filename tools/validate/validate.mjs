@@ -13,6 +13,7 @@
  *   7. the OpenAPI documents reconcile 1:1 with Appendix C via the C-number map
  *   8. no OpenAPI document names an error code the catalog does not define
  *   9. no deferral's target tag has passed with the deferred thing absent
+ *  10. the delta register projects all three appendices and every claim resolves
  *
  * Exit code is the number of failures, capped at 250.
  */
@@ -24,6 +25,7 @@ import YAML from 'yaml'
 import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
 import * as deferrals from './deferrals.mjs'
+import * as deltas from './deltas.mjs'
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..')
 const failures = []
@@ -630,6 +632,58 @@ check('the deferral check fires on ADR-KEM-009 at v0.4.0 (negative test)', () =>
     throw new Error('the check flagged a deferral that was delivered on time')
   }
   return '7 violations at v0.4.0 and at v0.2.0, none of the seven at v0.1.0'
+})
+
+// --------------------------------------- 10. the cross-repository delta register
+//
+// Repo 4's Appendix AI, Repo 3's Appendix AB and Repo 2's Appendix N are three
+// prose tables inside three 4,000-line specifications, which is why a delta's
+// disposition, target tag and owner could not be checked by anything.
+// docs/registers/delta-register-v1.yaml is the machine-readable projection.
+
+const deltaRegister = deltas.loadRegister(ROOT)
+
+check('the delta register validates against its schema', () => {
+  const instance = ajv()
+  assertValid(instance.compile(loadJson(deltas.SCHEMA_PATH)), deltaRegister, deltas.REGISTER_PATH)
+  return `${deltas.allDeltas(deltaRegister).length} deltas -- ${deltas.summarise(deltaRegister)}`
+})
+
+check('the delta register holds every row its appendices declare', () => {
+  const { problems, counts } = deltas.auditRowCounts(deltaRegister)
+  if (problems.length) throw new Error(problems.join('\n'))
+  return counts.join(', ')
+})
+
+check('every delta id in the register appears in the appendix it came from', () => {
+  // Only runs in full when the sibling repositories are checked out beside
+  // this one, which CI does not do. The detail line says which mode ran, so a
+  // pass that inspected nothing cannot look like a pass that inspected
+  // everything -- START-HERE 6.4, applied to this check rather than to a host.
+  const siblings = path.resolve(ROOT, '..')
+  const { problems, checked } = deltas.auditAgainstAppendices(deltaRegister, siblings)
+  if (problems.length) throw new Error(problems.join('\n'))
+  return checked.join('; ')
+})
+
+check('every artifact a delta claims resolves in the document that should hold it', () => {
+  const { problems, resolved } = deltas.auditArtifacts(deltaRegister, ROOT)
+  if (problems.length) throw new Error(problems.join('\n'))
+  if (resolved === 0) throw new Error('nothing resolved -- the check found no artifact to verify, which is a bug in the check, not a clean register')
+  return `${resolved} artifacts resolved, catalog ids cross-checked`
+})
+
+check('the delta register and the deferral register describe the same deferrals', () => {
+  const problems = deltas.auditDeferralLinkage(deltaRegister, deferralRegister)
+  if (problems.length) throw new Error(problems.join('\n'))
+  const deferred = deltas.allDeltas(deltaRegister).filter((d) => d.disposition === 'DEFERRED')
+  return `${deferred.length} deferred deltas, each with an enforceable target`
+})
+
+check('no delta relates to an id that does not exist', () => {
+  const { problems, counted } = deltas.auditCrossReferences(deltaRegister)
+  if (problems.length) throw new Error(problems.join('\n'))
+  return `${counted} cross-references resolved`
 })
 
 // ------------------------------------------------- negative test

@@ -1,0 +1,648 @@
+# Karyalay Mail — cross-repository delta register, machine-readable
+#
+# HAND-AUTHORED. The union of the three prose delta registers that the
+# consuming repositories maintain in their own specifications, in a form a
+# check can read.
+#
+# Why this file exists
+# --------------------
+# ADR-KEM-012 named the gap and named where it belongs:
+#
+#   "A check for that is worth writing and is not written here -- it belongs
+#    with whoever makes the delta register machine-readable, which is the same
+#    gap ADR-OPS-024 hit from the other side."
+#
+# Three repositories each keep a delta register and all three are prose tables
+# inside a 4,000-line specification:
+#
+#   karyalay-mail-ops   Appendix AI   15 rows   AI-01..AI-15
+#   karyalay-mail-infra Appendix AB   12 rows   direction/contract rows, no ids
+#   karyalay-webmail    Appendix N    15 rows   D-01..D-15
+#
+# Because they are prose, a delta's disposition, target tag and owner cannot be
+# checked by anything. That is how ADR-KEM-009's seven deferrals reached three
+# tags past their target with nobody noticing, and it is the same reason
+# ADR-OPS-024 could not machine-check which acceptance scenario belongs to
+# which phase. Both findings are the absence of this file.
+#
+# THE APPENDICES ARE THE AUTHORITY, NOT THIS FILE. Master Contract §0.3 puts a
+# consuming repository's spec above this repository's docs. This register is a
+# projection of those three appendices for checking purposes; where it and an
+# appendix disagree, the appendix wins and this file is the thing to fix. It is
+# deliberately not edited into the appendices, and the appendices were read
+# only -- four agents were working in those repositories on 2026-08-24.
+#
+# Dispositions
+# ------------
+#   CANONICAL   The contract already exists and needed no delta. AB's
+#               "EXISTING / CANONICAL" rows.
+#   CONFIRMED   Recorded as a delta, found on inspection to be already covered.
+#   RESOLVED    Published here. `resolved_in` names the tag and `satisfied_by`
+#               names the artifact, which is resolved for real by the check.
+#   PARTIAL     Some of the required contract exists and some does not. The
+#               missing half is named in `open_defects`, so "partial" is a
+#               statement with a list attached rather than a shrug.
+#   DEFERRED    A decision was taken to do it later. MUST appear in
+#               docs/registers/deferral-register-v1.yaml, which is what makes
+#               the target tag enforceable.
+#   OPEN        No decision has been taken. Not a deferral -- a deferral has a
+#               target and this does not. Every OPEN row must say what is
+#               absent, so the absence is evidenced rather than assumed.
+#   PROHIBITED  The contract must not exist. AB's "PROHIBITED DIRECT" row.
+#   EXTERNAL    Outside the programme's control.
+
+schema_version: "1.0.0"
+
+sources:
+
+  # ==========================================================================
+  - id: repo4-appendix-ai
+    repository: karyalay-mail-ops
+    appendix: Appendix AI — Cross-Repository Interface and Delta Register
+    path: docs/spec/repository-spec-v1.0.md
+    id_range: AI-01..AI-15
+    declared_row_count: 15
+    read_on: 2026-08-24
+
+    deltas:
+      - id: AI-01
+        owner: karyalay-mail
+        required_contract: >-
+          Authoritative restriction/action API for mailbox rate cap, outbound
+          lock, session/app-password revoke, tenant/domain send restriction,
+          with idempotency, precondition and audit.
+        appendix_disposition: Confirm/extend existing admin/security contract.
+        disposition: PARTIAL
+        satisfied_by:
+          - document: openapi/operations-api-v1.yaml
+            operation_id: requestRestriction
+            catalog_id: C.101
+          - document: openapi/operations-api-v1.yaml
+            operation_id: clearRestriction
+            catalog_id: C.102
+        open_defects:
+          - ref: ADR-KEM-013
+            summary: >-
+              The `Idempotency-Key` header on C.101 carries maxLength and no
+              pattern, while karyalay-mail enforces RFC 3986 unreserved
+              characters and reports a malformed key as a MISSING one.
+          - ref: ADR-KEM-014
+            summary: >-
+              Neither ETag nor If-Match is defined on C.101/C.102 and the live
+              service returns no version token, so the OPS-BND-002 precondition
+              has nowhere to be enforced.
+          - ref: null
+            summary: >-
+              Containment is incomplete. The row asks for session and
+              app-password revoke; C.62 and C.65 are customer-principal routes
+              under /api/v1. Ops can block future authentication and cannot end
+              a session an attacker already holds. Recorded in
+              karyalay-mail-ops T00.07b evidence; no ADR raised.
+
+      - id: AI-02
+        owner: karyalay-mail
+        required_contract: Migration resource/status/customer-visible reporting synchronization.
+        appendix_disposition: Repo1 spec mentions migrations; freeze exact event/API schemas.
+        disposition: OPEN
+        absence_evidence: >-
+          No migration operation appears in openapi/catalog-reconciliation-v1.yaml
+          and no migration subject appears in events/catalog-v1.yaml. The only
+          migration surface published anywhere here is AI-04's Repo 3 executor,
+          which is the machine half; the Repo 1 resource, status and
+          customer-visible reporting half has no contract.
+        blocks: karyalay-mail-ops Phase 2
+
+      - id: AI-03
+        owner: karyalay-mail
+        required_contract: Support-safe message/submission metadata lookup by trace/submission/message reference.
+        appendix_disposition: Confirm mailbox-user/admin API support and privacy scope.
+        disposition: PARTIAL
+        satisfied_by:
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: getSubmission
+            catalog_id: C.91
+        open_defects:
+          - ref: null
+            summary: >-
+              C.91 is /api/v1/mailboxes/{mailbox}/submissions/{submission} -- a
+              customer-principal route keyed by submission id. There is no
+              Ops-callable lookup, no lookup by trace reference, and no lookup
+              by Idempotency-Key, which is why karyalay-webmail Phase 3 records
+              that an attempt whose response never arrived cannot be reconciled
+              at all. The privacy scope the appendix asks to confirm is
+              unstated.
+
+      - id: AI-04
+        owner: karyalay-mail-infra
+        required_contract: >-
+          Allow-listed migration executor that can perform discovery, sync and
+          verify using Dovecot migration primitives without exposing generic
+          Doveadm.
+        appendix_disposition: Required delta if not already implemented.
+        disposition: RESOLVED
+        deferred_to: v0.2.0
+        deferred_by: ADR-KEM-009
+        resolved_in: v0.5.0
+        resolved_by: ADR-KEM-012
+        satisfied_by:
+          - document: openapi/infra-executor-api-v1.yaml
+            operation_id: executeMigrationStep
+
+      - id: AI-05
+        owner: karyalay-mail-infra
+        required_contract: >-
+          Allow-listed queue diagnostic/action service: summary, item metadata,
+          scoped hold/release/retry where approved; no shell.
+        appendix_disposition: Required typed interface.
+        disposition: RESOLVED
+        deferred_to: v0.2.0
+        deferred_by: ADR-KEM-009
+        resolved_in: v0.5.0
+        resolved_by: ADR-KEM-012
+        satisfied_by:
+          - document: openapi/infra-executor-api-v1.yaml
+            operation_id: queueDiagnostics
+
+      - id: AI-06
+        owner: karyalay-mail-infra
+        required_contract: >-
+          Mailbox restore executor: stage recovery point, verify, import
+          recovery folder, approved replacement mode.
+        appendix_disposition: Required typed interface.
+        disposition: RESOLVED
+        deferred_to: v0.2.0
+        deferred_by: ADR-KEM-009
+        resolved_in: v0.5.0
+        resolved_by: ADR-KEM-012
+        satisfied_by:
+          - document: openapi/infra-executor-api-v1.yaml
+            operation_id: executeRestore
+
+      - id: AI-07
+        owner: karyalay-mail-infra
+        required_contract: Read-only shard/DRBD/fencing/Galera/NATS/OpenBao health endpoint for Ops diagnostics.
+        appendix_disposition: Confirm/define.
+        disposition: RESOLVED
+        deferred_to: v0.2.0
+        deferred_by: ADR-KEM-009
+        resolved_in: v0.5.0
+        resolved_by: ADR-KEM-012
+        satisfied_by:
+          - document: openapi/infra-executor-api-v1.yaml
+            operation_id: readComponentHealth
+
+      - id: AI-08
+        owner: karyalay-mail-infra
+        required_contract: Backup catalog / recovery point and restore-verification events and queries.
+        appendix_disposition: Confirm/define.
+        disposition: RESOLVED
+        deferred_to: v0.2.0
+        deferred_by: ADR-KEM-009
+        resolved_in: v0.5.0
+        resolved_by: ADR-KEM-012
+        note: >-
+          Split delta. ADR-KEM-009 deferred only the query half; the event half
+          already existed as infra.v1.backup.*.
+        satisfied_by:
+          - document: openapi/infra-executor-api-v1.yaml
+            operation_id: readBackupCatalog
+
+      - id: AI-09
+        owner: karyalay-mail-infra
+        required_contract: "Maintenance typed actions: drain/restart/validate with action_id and preconditions."
+        appendix_disposition: Confirm/define.
+        disposition: RESOLVED
+        deferred_to: v0.2.0
+        deferred_by: ADR-KEM-009
+        resolved_in: v0.5.0
+        resolved_by: ADR-KEM-012
+        satisfied_by:
+          - document: openapi/infra-executor-api-v1.yaml
+            operation_id: executeMaintenanceAction
+
+      - id: AI-10
+        owner: karyalay-webmail, karyalay-mail
+        required_contract: >-
+          Spam/not-spam user feedback event semantics distinguishing inbound
+          filtering from internal-hosted sender complaint.
+        appendix_disposition: Required contract clarification.
+        disposition: OPEN
+        absence_evidence: >-
+          No spam-feedback subject exists in events/catalog-v1.yaml and no
+          feedback operation exists in any document. The same capability is
+          karyalay-webmail delta D-03, which IS deferred -- so one capability
+          is deferred from one register and undecided in another, which is
+          itself the argument for a single machine-readable register.
+        related: [D-03]
+
+      - id: AI-11
+        owner: shared
+        required_contract: >-
+          Canonical delivery event/message trace IDs including submission_id,
+          queue_ids and provider outcome metadata.
+        appendix_disposition: Freeze across Repo1/3/4.
+        disposition: CONFIRMED
+        satisfied_by:
+          - correlation_id: submission_id
+            file: observability/telemetry-contract-v1.yaml
+          - correlation_id: smtp_queue_id
+            file: observability/telemetry-contract-v1.yaml
+        note: >-
+          The telemetry contract also records the boundary honestly: trace
+          context stops at the SMTP boundary, and submission_id/smtp_queue_id
+          are what carry across it.
+
+      - id: AI-12
+        owner: shared
+        required_contract: >-
+          Canonical action envelope: action_id, idempotency_key, actor/service,
+          reason_code, evidence refs, precondition version, result/observed
+          state. Freeze machine-readable schema.
+        appendix_disposition: Freeze machine-readable schema.
+        disposition: RESOLVED
+        deferred_to: v0.2.0
+        deferred_by: ADR-KEM-009
+        resolved_in: v0.5.0
+        resolved_by: ADR-KEM-012
+        satisfied_by:
+          - schema: actions/action-envelope-v1.schema.json
+            schema_id: https://contracts.karyalay.in/mail/actions/action-envelope-v1.schema.json
+
+      - id: AI-13
+        owner: shared
+        required_contract: Sensitivity/redaction labels for support/evidence payloads.
+        appendix_disposition: Freeze enum/schema.
+        disposition: OPEN
+        absence_evidence: >-
+          No sensitivity or redaction vocabulary exists in events/, actions/,
+          errors/ or any OpenAPI document. karyalay-mail Appendix I OBS-002
+          (redaction) is unmapped to any test in that repository, so neither
+          side has it.
+
+      - id: AI-14
+        owner: shared
+        required_contract: Incident/change correlation IDs propagated to logs and actions when active.
+        appendix_disposition: Add optional headers/event fields.
+        disposition: OPEN
+        absence_evidence: >-
+          No incident_id or change_id field appears in any OpenAPI document,
+          event schema, action schema or the telemetry correlation vocabulary.
+        blocks: karyalay-mail-ops Phase 5
+
+      - id: AI-15
+        owner: karyalay-mail
+        required_contract: >-
+          Customer/admin permission to initiate and source-authorize migrations
+          without exposing the source secret to other components.
+        appendix_disposition: Freeze secure secret-reference flow.
+        disposition: OPEN
+        absence_evidence: >-
+          No secret-reference shape appears in any OpenAPI document. Depends on
+          AI-02, which is also OPEN.
+        related: [AI-02]
+
+  # ==========================================================================
+  - id: repo3-appendix-ab
+    repository: karyalay-mail-infra
+    appendix: Appendix AB — Cross-Repository Interface and Delta Register
+    path: docs/spec/repository-spec-v1.0.md
+    id_range: null
+    declared_row_count: 12
+    read_on: 2026-08-24
+    note: >-
+      Appendix AB's rows have no ID column -- they are keyed by direction plus
+      contract. The AB-nn ids below are assigned by this register for
+      referencing, in the appendix's own row order, and are not in the
+      appendix. `direction` is the cross-check key.
+
+    deltas:
+      - id: AB-01
+        direction: Repo1 -> Repo3
+        required_contract: GET /internal/v1/resources/{type}/{id}/desired-state
+        appendix_disposition: EXISTING / CANONICAL
+        disposition: CANONICAL
+        owner: karyalay-mail
+        satisfied_by:
+          - document: openapi/internal-provisioning-api-v1.yaml
+            operation_id: getResourceDesiredState
+
+      - id: AB-02
+        direction: Repo3 -> Repo1
+        required_contract: POST /internal/v1/resources/{type}/{id}/observations
+        appendix_disposition: EXISTING / CANONICAL
+        disposition: CANONICAL
+        owner: karyalay-mail
+        satisfied_by:
+          - document: openapi/internal-provisioning-api-v1.yaml
+            operation_id: reportResourceObservation
+
+      - id: AB-03
+        direction: Repo3 -> Repo1
+        required_contract: POST /internal/v1/provisioning/{operation}/started
+        appendix_disposition: EXISTING / CANONICAL
+        disposition: CANONICAL
+        owner: karyalay-mail
+        satisfied_by:
+          - document: openapi/internal-provisioning-api-v1.yaml
+            operation_id: reportProvisioningStarted
+
+      - id: AB-04
+        direction: Repo3 -> Repo1
+        required_contract: POST /internal/v1/provisioning/{operation}/result
+        appendix_disposition: EXISTING / CANONICAL
+        disposition: CANONICAL
+        owner: karyalay-mail
+        satisfied_by:
+          - document: openapi/internal-provisioning-api-v1.yaml
+            operation_id: reportProvisioningResult
+
+      - id: AB-05
+        direction: Repo1 -> Repo3
+        required_contract: NATS domain.* / mailbox.* / dkim.* / quota.* / restrictions / filters events
+        appendix_disposition: EXISTING / CANONICAL
+        disposition: CANONICAL
+        owner: karyalay-mail
+        note: >-
+          The catalog exists and is validated here. Whether anything publishes
+          it is a different question and not this register's: karyalay-mail's
+          only EventPublisher implementation refuses to publish, pending the
+          NATS cluster that karyalay-mail-infra Phase 6 would build.
+
+      - id: AB-06
+        direction: Repo1 -> Repo3 mailbox gateway
+        required_contract: >-
+          listFolders, folderStatus, createFolder, renameFolder, deleteFolder,
+          listMessages, fetchMessageMetadata, streamMessagePart, search,
+          setFlags, moveMessages, copyMessages, saveMessage, expunge, quota
+        appendix_disposition: EXISTING / CANONICAL
+        disposition: CANONICAL
+        owner: karyalay-mail-infra
+        note: >-
+          Transport settled by ADR-KEM-002 -- pooled IMAP with a master user
+          for data operations, Doveadm HTTP retained for admin operations.
+
+      - id: AB-07
+        direction: Repo3 -> Repo1
+        required_contract: submission.accepted/rejected/status_unknown telemetry and event linkage including smtp_queue_id
+        appendix_disposition: EXISTING / CANONICAL
+        disposition: CANONICAL
+        owner: karyalay-mail-infra
+        related: [AI-11]
+
+      - id: AB-08
+        direction: Repo3 -> Repo4
+        required_contract: Delivery/reputation metrics and log query surfaces
+        appendix_disposition: "OWNER: Repo3 telemetry; query UX Repo4"
+        disposition: PARTIAL
+        owner: karyalay-mail-infra
+        open_defects:
+          - ref: null
+            summary: >-
+              Metrics exist under the Repo 3 §67 requirement; a typed query
+              surface does not, which is the same split ADR-KEM-009 recorded
+              against AI-07. AI-07's synchronous half is now RESOLVED as
+              readComponentHealth; the delivery/reputation query half is not.
+
+      - id: AB-09
+        direction: Repo4 -> Repo3
+        required_contract: Operational actions such as controlled queue retry, IP drain, migration maintenance state
+        appendix_disposition: >-
+          EXISTING / CANONICAL as of contracts v0.5.0 (ADR-INF-038,
+          ADR-KEM-012); Repo 3 owes the implementation
+        disposition: RESOLVED
+        owner: karyalay-mail-infra
+        resolved_in: v0.5.0
+        resolved_by: ADR-KEM-012
+        related: [AI-04, AI-05, AI-06, AI-07, AI-08, AI-09]
+        satisfied_by:
+          - document: openapi/infra-executor-api-v1.yaml
+            operation_id: executeMaintenanceAction
+        note: >-
+          This is the AB row ADR-KEM-009 quoted to justify deferring AI-04..AI-09
+          ("until its contract is approved, Repo 3 exposes only local
+          admin/runbook tooling, not a speculative production API"). The
+          contract is approved; the implementation is not written, and
+          publishing ahead of implementation is the sequencing working as
+          intended rather than a gap.
+
+      - id: AB-10
+        direction: Repo2 -> Repo3
+        required_contract: None direct in production
+        appendix_disposition: PROHIBITED DIRECT
+        disposition: PROHIBITED
+        owner: karyalay-webmail
+        note: Browser and webmail traverse Repo 1 APIs only.
+
+      - id: AB-11
+        direction: Repo3 -> Keycloak
+        required_contract: OIDC/JWKS/token validation and admin infra where assigned
+        appendix_disposition: SHARED
+        disposition: CANONICAL
+        owner: shared
+        satisfied_by:
+          - file: auth/claims-v1.yaml
+
+      - id: AB-12
+        direction: Repo3 -> DNS registrar/registry
+        required_contract: DS/delegation/public domain lifecycle where automation is possible
+        appendix_disposition: DEPLOYMENT-SPECIFIC
+        disposition: EXTERNAL
+        owner: karyalay-mail-infra
+        note: External unavoidable dependency; typed automation adapters only.
+
+  # ==========================================================================
+  - id: repo2-appendix-n
+    repository: karyalay-webmail
+    appendix: Appendix N — Mandatory Cross-Repository Contract Deltas
+    path: docs/spec/repository-spec-v1.0.md
+    id_range: D-01..D-15
+    declared_row_count: 15
+    read_on: 2026-08-24
+
+    deltas:
+      - id: D-01
+        owner: karyalay-mail
+        required_contract: Thread list/summary with folder/search scope, cursor, ThreadSummary, counts and latest message metadata
+        appendix_priority: P0 for premium threaded UI
+        disposition: RESOLVED
+        resolved_in: v0.3.0
+        resolved_by: ADR-KEM-010
+        satisfied_by:
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: listMailboxThreads
+            catalog_id: C.108
+
+      - id: D-02
+        owner: karyalay-mail
+        required_contract: Mailbox change feed — authenticated SSE/WebSocket/long-poll with a resumable cursor
+        appendix_priority: P1; polling fallback works
+        disposition: DEFERRED
+        deferred_by: ADR-KEM-010
+        deferral_register_entry: D-02
+        blocks: karyalay-webmail Phase 5 T05.02
+
+      - id: D-03
+        owner: karyalay-mail
+        required_contract: Spam/phishing feedback — POST message feedback with classification, idempotency and audit
+        appendix_priority: P1
+        disposition: DEFERRED
+        deferred_by: ADR-KEM-010
+        deferral_register_entry: D-03
+        blocks: karyalay-webmail Phase 5 T05.04
+        related: [AI-10]
+
+      - id: D-04
+        owner: karyalay-mail
+        required_contract: Personal contacts — list/search/create/update/delete with cursor, version and normalized addresses
+        appendix_priority: P1 standard mailbox quality
+        disposition: RESOLVED
+        resolved_in: v0.3.0
+        resolved_by: ADR-KEM-010
+        note: >-
+          Ownership was ambiguous in Appendix N ("karyalay-mail or a dedicated
+          Karyalay contacts service"). ADR-KEM-010 resolved it to karyalay-mail
+          because no contacts service exists and none is planned. This is the
+          one of the three that is a new resource rather than a projection.
+        satisfied_by:
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: listMailboxContacts
+            catalog_id: C.109
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: createMailboxContact
+            catalog_id: C.110
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: getMailboxContact
+            catalog_id: C.111
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: updateMailboxContact
+            catalog_id: C.112
+          - document: openapi/mailbox-api-v1.yaml
+            operation_id: deleteMailboxContact
+            catalog_id: C.113
+
+      - id: D-05
+        owner: karyalay-mail
+        required_contract: Organisation directory search with minimum length, visibility policy, result fields, cursor and rate limit
+        appendix_priority: P1
+        disposition: RESOLVED
+        resolved_in: v0.3.0
+        resolved_by: ADR-KEM-010
+        note: >-
+          Appendix N proposed "Karyalay identity/directory + mail gateway".
+          ADR-KEM-010 read it instead as a search projection over the Member
+          set karyalay-mail already owns via C.4, deliberately keeping every
+          autocomplete keystroke off the IdP.
+        satisfied_by:
+          - document: openapi/public-control-api-v1.yaml
+            operation_id: searchOrganisationDirectory
+            catalog_id: C.114
+
+      - id: D-06
+        owner: karyalay-mail
+        required_contract: Cross-device webmail preferences with version/ETag
+        appendix_priority: P2
+        disposition: OPEN
+        absence_evidence: No preferences operation exists in any document. Local fallback is possible, which is why it was never raised.
+
+      - id: D-07
+        owner: karyalay-mail-infra, karyalay-mail
+        required_contract: Remote-image privacy proxy — authenticated proxy token or endpoint, SSRF-safe fetch, redirect/IP/content caps
+        appendix_priority: P1 privacy feature; block-only fallback
+        disposition: DEFERRED
+        deferred_by: ADR-KEM-010
+        deferral_register_entry: D-07
+        blocks: karyalay-webmail Phase 5 T05.05
+
+      - id: D-08
+        owner: karyalay-mail
+        required_contract: Message security assessment metadata — normalized SPF/DKIM/DMARC/ARC outcome, verdict, list metadata, Reply-To cues
+        appendix_priority: P1 safety
+        disposition: OPEN
+        absence_evidence: >-
+          No normalized security-assessment shape exists in mailbox-api-v1.yaml.
+          Until it does, a security banner is drawn from raw headers parsed in
+          the browser, which is what the delta exists to stop.
+
+      - id: D-09
+        owner: karyalay-mail
+        required_contract: Server-side selection token for bounded "all matching" mutation with snapshot semantics and TTL
+        appendix_priority: P2; loaded-selection works
+        disposition: OPEN
+        absence_evidence: No selection-token operation exists.
+
+      - id: D-10
+        owner: karyalay-mail, karyalay-mail-infra
+        required_contract: Send hold/cancel/scheduled send — server-owned SCHEDULED/HELD state with a cancel endpoint before release
+        appendix_priority: Deferred; must not fake in v1
+        disposition: OPEN
+        absence_evidence: >-
+          No SCHEDULED or HELD submission state exists in mailbox-api-v1.yaml.
+          Appendix N's own priority column says "Deferred", but no ADR ever
+          dispositioned it, so it has no target and no owner and is recorded
+          here as OPEN rather than DEFERRED. The distinction is the point: a
+          deferral has a target, and a priority column saying "deferred" is not
+          a decision.
+
+      - id: D-11
+        owner: karyalay-mail
+        required_contract: Canonical reply/bootstrap metadata — delivered-to identity, normalized Reply-To, references/list headers, safe reply targets
+        appendix_priority: P0/P1 depending on existing C.71/C.80 payload
+        disposition: OPEN
+        absence_evidence: >-
+          karyalay-webmail Phase 2 records A053 as covered only in part for
+          exactly this reason. Whether C.71/C.80 already carry enough was the
+          appendix's own open question and it has not been answered.
+
+      - id: D-12
+        owner: karyalay-mail
+        required_contract: Thread mutation endpoint — bounded thread action or enumerated stable message set with snapshot semantics
+        appendix_priority: P2; client bounded per-message fallback
+        disposition: OPEN
+        absence_evidence: No thread mutation operation exists. C.108 is a read.
+
+      - id: D-13
+        owner: karyalay-mail
+        required_contract: Notification/push registration — register/revoke browser push subscription with a minimal payload contract
+        appendix_priority: P2
+        disposition: DEFERRED
+        deferred_by: ADR-KEM-010
+        deferral_register_entry: D-13
+        blocks: karyalay-webmail Phase 5 T05.03
+
+      - id: D-14
+        owner: karyalay-mail
+        required_contract: Safe unsubscribe — parsed List-Unsubscribe metadata plus a server-mediated one-click action with allowlist and SSRF policy
+        appendix_priority: P2
+        disposition: OPEN
+        absence_evidence: No unsubscribe operation or metadata shape exists.
+
+      - id: D-15
+        owner: karyalay-mail
+        required_contract: Canonical read behaviour setting, if expected across clients
+        appendix_priority: P2
+        disposition: OPEN
+        absence_evidence: No preferences surface exists. Same gap as D-06.
+
+      # The sixteenth row Appendix N does not have.
+      - id: D-UNREGISTERED-01
+        owner: karyalay-mail
+        required_contract: Session bootstrap — GET /api/v1/me/session returning the principal, entitlements and the mailbox switcher set
+        appendix_priority: null
+        disposition: RESOLVED
+        resolved_in: v0.4.0
+        resolved_by: ADR-KEM-011
+        in_appendix: false
+        note: >-
+          NOT AN APPENDIX N ROW, and recorded here because that is the finding.
+          ADR-KEM-011's own title is "the Appendix N delta that was never
+          registered": karyalay-webmail needed a session bootstrap from §7 and
+          Appendices F and G, and it never reached the delta register at all.
+          A register that is prose can omit a row without anything noticing,
+          which is the same class of defect as a deferral whose target passes
+          unwatched. Appendix N still has fifteen rows; whoever owns it should
+          decide whether this becomes D-16 or stays a footnote, and this
+          repository does not edit that appendix.
+        satisfied_by:
+          - document: openapi/public-control-api-v1.yaml
+            operation_id: getMySession
+            catalog_id: C.115

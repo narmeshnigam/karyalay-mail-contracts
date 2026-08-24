@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.karyalay.in/mail/registers/delta-register-v1.schema.json",
+  "title": "Cross-repository delta register",
+  "description": "The machine-readable projection of karyalay-mail-ops Appendix AI, karyalay-mail-infra Appendix AB and karyalay-webmail Appendix N. The appendices remain the authority (Master Contract 0.3); this shape exists so a delta's disposition, target tag and owner can be checked by something other than a person reading three 4,000-line specifications.",
+  "type": "object",
+  "required": ["schema_version", "sources"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["id", "repository", "appendix", "path", "declared_row_count", "read_on", "deltas"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "repository": { "enum": ["karyalay-mail", "karyalay-webmail", "karyalay-mail-infra", "karyalay-mail-ops"] },
+        "appendix": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "id_range": { "type": ["string", "null"] },
+        "declared_row_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The number of rows the appendix holds. Checked against the number of deltas below that are marked as being in the appendix, so a row cannot be dropped from this projection silently."
+        },
+        "read_on": { "type": "string", "format": "date" },
+        "note": { "type": "string" },
+        "deltas": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/delta" } }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "required": ["id", "owner", "required_contract", "disposition"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]*$" },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Who owes the contract. Never blank -- an unowned delta is the ADR-KEM-009 defect, and 'shared' is a real answer where the appendix says so."
+        },
+        "direction": { "type": "string" },
+        "required_contract": { "type": "string", "minLength": 1 },
+        "appendix_disposition": { "type": ["string", "null"] },
+        "appendix_priority": { "type": ["string", "null"] },
+        "in_appendix": {
+          "type": "boolean",
+          "default": true,
+          "description": "False only for a capability this programme needed and the appendix never registered. Such a row does not count against declared_row_count."
+        },
+        "disposition": {
+          "enum": ["CANONICAL", "CONFIRMED", "RESOLVED", "PARTIAL", "DEFERRED", "OPEN", "PROHIBITED", "EXTERNAL"]
+        },
+        "deferred_to": { "type": "string", "pattern": "^v\\d+\\.\\d+\\.\\d+$" },
+        "deferred_by": { "type": "string" },
+        "deferral_register_entry": {
+          "type": "string",
+          "description": "The id in deferral-register-v1.yaml. Required for DEFERRED, because that register is what makes the target tag enforceable."
+        },
+        "resolved_in": { "type": "string", "pattern": "^v\\d+\\.\\d+\\.\\d+$" },
+        "resolved_by": { "type": "string" },
+        "satisfied_by": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/artifact" } },
+        "open_defects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/defect" } },
+        "absence_evidence": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required for OPEN. What was looked for and not found, so 'nothing exists' is a checked statement rather than an assumption."
+        },
+        "blocks": { "type": "string" },
+        "related": { "type": "array", "items": { "type": "string" } },
+        "note": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "disposition": { "const": "RESOLVED" } }, "required": ["disposition"] },
+          "then": { "required": ["resolved_in", "resolved_by", "satisfied_by"] }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "DEFERRED" } }, "required": ["disposition"] },
+          "then": { "required": ["deferred_by", "deferral_register_entry"] }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "OPEN" } }, "required": ["disposition"] },
+          "then": { "required": ["absence_evidence"] }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "PARTIAL" } }, "required": ["disposition"] },
+          "then": { "required": ["open_defects"] }
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["document", "operation_id"] },
+        { "required": ["schema", "schema_id"] },
+        { "required": ["correlation_id", "file"] },
+        { "required": ["file"] }
+      ],
+      "properties": {
+        "document": { "type": "string", "pattern": "^openapi/.+\\.yaml$" },
+        "operation_id": { "type": "string", "minLength": 1 },
+        "catalog_id": { "type": "string", "pattern": "^(C|AI)[.-][0-9]+$" },
+        "schema": { "type": "string", "pattern": "\\.schema\\.json$" },
+        "schema_id": { "type": "string", "format": "uri" },
+        "correlation_id": { "type": "string" },
+        "file": { "type": "string", "minLength": 1 }
+      }
+    },
+    "defect": {
+      "type": "object",
+      "required": ["ref", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": ["string", "null"],
+          "description": "The ADR that proposes the fix, or null where the defect is known and no ADR has been raised. Null is a finding, not a blank."
+        },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
