@@ -14,6 +14,7 @@
  *   8. no OpenAPI document names an error code the catalog does not define
  *   9. no deferral's target tag has passed with the deferred thing absent
  *  10. the delta register projects all three appendices and every claim resolves
+ *  11. every task's frontmatter status matches the glyph in its phase index
  *
  * Exit code is the number of failures, capped at 250.
  */
@@ -26,6 +27,7 @@ import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
 import * as deferrals from './deferrals.mjs'
 import * as deltas from './deltas.mjs'
+import * as taskindex from './taskindex.mjs'
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..')
 const failures = []
@@ -693,6 +695,25 @@ check('every ADR the delta register names exists and is in the decision register
   // ADR-KEM-009 shape one level down, and the count should only ever fall.
   return `${counted} ADR references resolved; ${unraised} known defect(s) with NO ADR raised`
 })
+
+// ------------------------------------------------- task tree
+
+check("every task's frontmatter status matches the glyph in its phase index", () => {
+  const { drifted, checked } = taskindex.auditIndex(ROOT)
+  if (drifted.length) throw new Error(drifted.join('\n'))
+  // Non-vacuity. Every assertion above passes over an empty task tree, and a
+  // regex that stopped matching would produce exactly that.
+  if (checked < 12) throw new Error(`only ${checked} index rows were read; the scan is not finding the task tree`)
+  return `${checked} index rows agree with their task frontmatter`
+})
+
+check('the legend in tasks/README.md is the one this harness enforces', () => {
+  const problems = taskindex.auditLegend(ROOT)
+  if (problems.length) throw new Error(problems.join('\n'))
+  return `${Object.keys(taskindex.GLYPH).length} statuses, legend and harness agree`
+})
+
+check('a drifted index row is actually caught (negative test)', () => taskindex.selfTest())
 
 // ------------------------------------------------- negative test
 check('a deliberately broken catalog fails (negative test)', () => {

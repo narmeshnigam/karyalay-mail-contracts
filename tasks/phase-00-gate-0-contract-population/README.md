@@ -1,7 +1,7 @@
 ---
 phase: 00
 status: done
-last-updated: 2026-08-24
+last-updated: 2026-08-26
 ---
 
 # Phase 00 — Gate 0: contract population
@@ -43,7 +43,7 @@ and Master Contract §0.3:
 | [T00.09](T00.09-validation-harness.md) | Validation harness + consumer pinning guide | ☑ done | — | Master §0.3; ADR-KEM-001 |
 | [T00.10](T00.10-decide-adr-kem-002.md) | Decide ADR-KEM-002 (gateway transport) | ☑ done | — | Repo 1 §19 |
 | [T00.11](T00.11-decide-adr-kem-003.md) | Decide ADR-KEM-003 (storage HA ceiling) | ☑ done | — | Repo 3 §56–§57, App. AG |
-| [T00.12](T00.12-tag-v0.1.0-gate-0-closure.md) | Tag `v0.1.0` + Gate 0 closure evidence | ◐ in-progress | — | ADR-KEM-001 |
+| [T00.12](T00.12-tag-v0.1.0-gate-0-closure.md) | Tag `v0.1.0` + Gate 0 closure evidence | ☑ done | — | ADR-KEM-001 |
 
 ## Phase-gate evidence checklist
 
@@ -51,8 +51,13 @@ and Master Contract §0.3:
   21 checks, 0 failures; `npm run lint`, 0 errors. Reproducible on any checkout
   of the tag.
 - ☑ `v0.1.0` tag exists and is annotated with the artifact inventory
-- ☐ Four consumer CI validation runs recorded (one per repo) — **the remaining
-  gate.** Per ADR-KEM-001 the tag unblocks Wave 1; Gate 0 closes during it.
+- ☑ Four consumer CI validation runs recorded (one per repo) — all four ran
+  2026-08-24 and all four verify in **FULL** mode (the tag fetched and compared,
+  not only the committed copies digested). Per ADR-KEM-001 the tag unblocked
+  Wave 1 and Gate 0 closed during it; the four runs and the `v0.2.1`/`v0.4.0`
+  pin drift they exposed are recorded in
+  [T00.12](T00.12-tag-v0.1.0-gate-0-closure.md) and
+  [../../docs/evidence/gate-0/CLOSURE.md](../../docs/evidence/gate-0/CLOSURE.md).
 - ☑ Decision register updated for ADR-KEM-002 and ADR-KEM-003 outcomes
   (both ACCEPTED 2026-08-17)
 
