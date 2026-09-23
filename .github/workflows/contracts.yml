@@ -122,9 +122,22 @@ jobs:
       - name: The tag must be annotated and must not move
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          if [ "$(git cat-file -t "$TAG")" != "tag" ]; then
+          # actions/checkout fetches a tag push as `+<commit>:refs/tags/<tag>`,
+          # which REPLACES the annotated tag object with a lightweight ref to its
+          # commit ("t [tag update]" in its log). Asking that ref for its type
+          # therefore answered "commit" for every tag ever pushed, and this job
+          # failed on v0.1.0 through v0.5.0 -- all of them annotated -- so its
+          # red result carried no information. Fetch the tag object itself.
+          git fetch --force --no-tags origin "+refs/tags/${TAG}:refs/tags/${TAG}"
+          if [ "$(git cat-file -t "refs/tags/$TAG")" != "tag" ]; then
             echo "::error::$TAG is a lightweight tag. Master 0.3 requires an annotated tag carrying the release inventory."
             exit 1
           fi
-          echo "$TAG is annotated:"
+          # "Must not move": the tag on origin must still name the commit this
+          # run was triggered for.
+          if [ "$(git rev-parse "refs/tags/$TAG^{commit}")" != "$GITHUB_SHA" ]; then
+            echo "::error::$TAG now names $(git rev-parse "refs/tags/$TAG^{commit}"), not $GITHUB_SHA, the commit it was pushed at. A published tag never moves."
+            exit 1
+          fi
+          echo "$TAG is annotated and names $GITHUB_SHA:"
           git tag -n99 "$TAG"
