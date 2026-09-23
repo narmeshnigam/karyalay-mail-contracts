@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — public control API"
-  version: 0.6.0
+  version: 0.7.0
   summary: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions."
   description: "Customer administration: organisation, entitlements, members, domains, DNS, DKIM, transfers, mailboxes, aliases, identities, groups, mailbox settings, sessions, credentials, audit, security, exports and restrictions.\n\n**Source:** karyalay-mail repository-spec-v1.0 §26-§27, Appendix C.1-C.65 and C.92-C.96.\n**Audience:** Browser and API clients acting for a customer principal.\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 74 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.6.0
+  x-karyalay-contract-version: 0.7.0
 servers:
   - url: https://api.mail.karyalay.in
     description: Production.
@@ -416,9 +416,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: true
-          description: "Required by this operation's Appendix C card. Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1)."
+          description: "Required by this operation's Appendix C card; an absent header is IDEMPOTENCY_KEY_REQUIRED (400). Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -625,9 +626,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "201":
@@ -675,9 +677,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "202":
@@ -768,9 +771,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "202":
@@ -818,9 +822,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "202":
@@ -868,9 +873,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -928,9 +934,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "202":
@@ -1021,9 +1028,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: true
-          description: "Required by this operation's Appendix C card. Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1)."
+          description: "Required by this operation's Appendix C card; an absent header is IDEMPOTENCY_KEY_REQUIRED (400). Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -1083,9 +1091,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -1186,9 +1195,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "202":
@@ -1236,9 +1246,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "200":
@@ -1357,9 +1368,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: true
-          description: "Required by this operation's Appendix C card. Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1)."
+          description: "Required by this operation's Appendix C card; an absent header is IDEMPOTENCY_KEY_REQUIRED (400). Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -1629,9 +1641,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -1689,9 +1702,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "202":
@@ -1739,9 +1753,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "202":
@@ -1884,9 +1899,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -2042,9 +2058,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -2297,9 +2314,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -2510,9 +2528,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -2765,9 +2784,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -3185,9 +3205,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -3291,9 +3312,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       responses:
         "200":
@@ -3393,9 +3415,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -3651,9 +3674,10 @@ paths:
         - name: Idempotency-Key
           in: header
           required: false
-          description: "Honoured when supplied (Master §20.5)."
+          description: "Honoured when supplied (Master §20.5).\n\nRFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class Repo 1 §34.1 enforces, and the same pattern as the action envelope's `idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so a key shaped like a path or a URN is refused. A header that is present but outside the pattern is VALIDATION_FAILED (422) with the header named in the structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means the header is absent."
           schema:
             type: string
+            pattern: "^[A-Za-z0-9._~-]{1,128}$"
             maxLength: 128
       requestBody:
         required: true
@@ -4176,13 +4200,16 @@ components:
             - type: string
               format: date-time
             - type: "null"
+        version:
+          type: string
+          description: "Opaque restriction-state version of the restricted resource (`resource_type`/`resource_id`) as of this representation. Where the response carries an ETag (C.101, C.102) this is the same value. It is the token a caller supplies back as a precondition (ADR-KEM-014, OPS-BND-002). Compare it for equality only; never parse or construct it."
       required:
         - restriction_id
         - resource_type
         - resource_id
         - restriction_code
         - starts_at
-      "$comment": "Source: Repo 1 Appendix A.30 restrictions; §36."
+      "$comment": "Source: Repo 1 Appendix A.30 restrictions; §36; `version` from ADR-KEM-014."
     DataExportJob:
       type: object
       description: "Asynchronous export job. The artifact is encrypted and expiring (C.94 notes)."

@@ -23,14 +23,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — infrastructure executor API"
-  version: 0.6.0
+  version: 0.7.0
   summary: "The six typed, allow-listed executors Repo 4 calls on Repo 3 (Appendix AI AI-04..AI-09)."
   description: "The six typed, allow-listed executors Repo 4 calls on Repo 3.\n\n**Source:** karyalay-mail-ops repository-spec-v1.0 Appendix AI rows AI-04..AI-09 and AI-12; karyalay-mail-infra §29, §34, §58, §67, §72 and Appendix AB.\n**Authorised by:** karyalay-mail-infra ADR-INF-038 (ACCEPTED 2026-08-24) and karyalay-mail-contracts ADR-KEM-012.\n**Audience:** karyalay-mail-ops service identities only. Not a public route, not reachable from Repo 1 or Repo 2.\n\n**The allow-list is closed.** Six operations, no seventh, and no field on any of them carries a command, a path, a query, a script or a byte payload. Growing the list is a new ADR under Appendix AB's delta rule; adding a `command` field is refused outright.\n\n**Mutations carry the AI-12 envelope; reads do not.** Forcing a reason code on a health check trains people to type a placeholder, and a field that is usually a placeholder is worthless where it matters. AI-05 is the one operation whose classification is per REQUEST rather than per operation: `INSPECT` is a read, and `HOLD`/`RELEASE`/`RETRY` are mutations.\n\nConventions (Repo 1 §26, Master §20): snake_case JSON; RFC 3339 UTC timestamps; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `application/problem+json` errors carrying a stable `code` from errors/error-catalog-v1.yaml."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.6.0
+  x-karyalay-contract-version: 0.7.0
   x-karyalay-hand-authored: true
 
 servers:

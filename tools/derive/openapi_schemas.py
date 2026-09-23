@@ -353,9 +353,19 @@ SCHEMAS = {
             "starts_at": TS,
             "expires_at": {"oneOf": [TS, {"type": "null"}]},
             "cleared_at": {"oneOf": [TS, {"type": "null"}]},
+            # A string, not the integer VERSION the other resources carry: this
+            # is not a row version of A.30 but the restriction state of the
+            # resource the row restricts, and ADR-KEM-014 publishes it as an
+            # opaque token. Optional -- the service returned no version token at
+            # all when T00.07b ran against it, and a required field it cannot
+            # yet populate would break every response.
+            "version": {
+                "type": "string",
+                "description": "Opaque restriction-state version of the restricted resource (`resource_type`/`resource_id`) as of this representation. Where the response carries an ETag (C.101, C.102) this is the same value. It is the token a caller supplies back as a precondition (ADR-KEM-014, OPS-BND-002). Compare it for equality only; never parse or construct it.",
+            },
         },
         ["restriction_id", "resource_type", "resource_id", "restriction_code", "starts_at"],
-        "Repo 1 Appendix A.30 restrictions; §36",
+        "Repo 1 Appendix A.30 restrictions; §36; `version` from ADR-KEM-014",
     ),
 
     # --- addressing -------------------------------------------------------

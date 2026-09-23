@@ -13,6 +13,9 @@ Keys:
   status    success status code (default 200, or 201/202/204 where the card says so)
   list      response is a cursor page of `res`
   binary    response is a stream, not JSON
+  etag      name of the headers component the success response carries as
+            `ETag`, where the token is something other than the
+            representation's own version (ADR-KEM-014)
   op        operationId; derived once, here, so it is stable across regeneration
 """
 
@@ -136,8 +139,12 @@ OPS = {
     "C.106": dict(doc=PROVISIONING, op="getReadiness", res="HealthStatus", unauthenticated=True),
     "C.107": dict(doc=PROVISIONING, op="getVersion", res="VersionInfo"),
     # --- operations -------------------------------------------------------
-    "C.101": dict(doc=OPERATIONS, op="requestRestriction", req="RestrictionRequest", res="Restriction", status=202),
-    "C.102": dict(doc=OPERATIONS, op="clearRestriction", res="Restriction"),
+    # C.101/C.102 return the restricted resource's restriction-state version as
+    # their ETag: ADR-KEM-014 decision 2, ACCEPTED 2026-09-24. The If-Match half
+    # of that decision is NOT bound here -- it comes from the Appendix C cards,
+    # which karyalay-mail owns, and the generator reads it from them.
+    "C.101": dict(doc=OPERATIONS, op="requestRestriction", req="RestrictionRequest", res="Restriction", status=202, etag="RestrictionStateETag"),
+    "C.102": dict(doc=OPERATIONS, op="clearRestriction", res="Restriction", etag="RestrictionStateETag"),
     "C.103": dict(doc=OPERATIONS, op="getResourceDiagnostics", res="ResourceDiagnostics"),
     "C.104": dict(doc=OPERATIONS, op="submitSecurityEvent", req="SecurityEventSubmission", status=202, res="SecurityEventAccepted"),
     # --- D-01/D-04/D-05, accepted by ADR-KEM-010 --------------------------

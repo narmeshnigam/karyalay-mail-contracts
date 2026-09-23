@@ -18,8 +18,8 @@ details live in the linked ADRs.
 | ADR-KEM-010 | Webmail deltas D-01, D-04 and D-05 accepted into the contract as C.108–C.114; D-02, D-03, D-07 and D-13 remain deferred and undecided | **ACCEPTED 2026-08-22** | Published in `v0.3.0`. karyalay-mail serves all seven operations as of 2026-08-22 (`ServedOperationsTest::OUTSTANDING` is empty). The four still-deferred deltas block four Repo 2 Phase 5 tasks, so Wave 5 cannot open its webmail half without deciding them. |
 | ADR-KEM-011 | Session bootstrap endpoint C.115, the Appendix N delta that was never registered | **ACCEPTED 2026-08-22** | Published in `v0.4.0`. Repo 1 Appendix C grows 114 → 115. |
 | ADR-KEM-012 | Publish AI-12 (canonical action envelope) and AI-04..AI-09 (the six typed Repo 3 executors) in `v0.5.0`, over karyalay-mail-infra ADR-INF-038 | **ACCEPTED 2026-08-24** | Closes the gap ADR-KEM-009 opened: its deferral to `v0.2.0` named a prerequisite Repo 3 ADR that nobody raised, and the target passed three tags. Unblocks ten Repo 4 tasks. Also fixes AI-05's per-request mutability, which Repo 4's client had wrong, and publishes the `idempotency_key` pattern T00.07b found unpublished. |
-| ADR-KEM-013 | Publish the `Idempotency-Key` pattern the API already enforces, and stop reporting a malformed key as a missing one | **ACCEPTED by the programme owner, 2026-09-24** | Proposed 2026-08-24, accepted as written. Raised by ops T00.07b against a running karyalay-mail. `operations-api-v1.yaml` publishes `maxLength` and no `pattern` while §34.1 accepts RFC 3986 unreserved only — and answers `IDEMPOTENCY_KEY_REQUIRED` to a caller that sent one. Appendix AP.1's own example key contains colons, so a client following the spec fails every C.101 request permanently. `v0.5.0` already publishes the right pattern on the action envelope; the header contradicts it. Fix is in the generator, not the YAML. |
-| ADR-KEM-014 | Give OPS-BND-002's precondition somewhere to live on C.101/C.102 — an internal read of effective restrictions, an ETag, and an optional `If-Match` | **ACCEPTED by the programme owner, 2026-09-24** | Proposed 2026-08-24, accepted as written. Neither `ETag` nor `If-Match` is defined and the live service returns no version token, so a restriction requested against a stale view is applied rather than refused. There is also no Ops-callable read of effective restrictions at all — C.96 is a customer-principal mailbox route — so `If-Match` cannot be added alone. Needs an Appendix C card from karyalay-mail; the generator must not be taught a special case. |
+| ADR-KEM-013 | Publish the `Idempotency-Key` pattern the API already enforces, and stop reporting a malformed key as a missing one | **ACCEPTED by the programme owner, 2026-09-24** | Proposed 2026-08-24, accepted as written. Raised by ops T00.07b against a running karyalay-mail. `operations-api-v1.yaml` publishes `maxLength` and no `pattern` while §34.1 accepts RFC 3986 unreserved only — and answers `IDEMPOTENCY_KEY_REQUIRED` to a caller that sent one. Appendix AP.1's own example key contains colons, so a client following the spec fails every C.101 request permanently. `v0.5.0` already publishes the right pattern on the action envelope; the header contradicts it. Fix is in the generator, not the YAML. **Published in `v0.7.0`:** the pattern on all 40 headers (the ADR counted 39; C.117 came after it), a harness check holding every header to the envelope's pattern, and the absent-vs-malformed selection in each header's description. karyalay-mail still owes the `VALIDATION_FAILED` response; karyalay-mail-ops still owes Appendix AP.1's example. |
+| ADR-KEM-014 | Give OPS-BND-002's precondition somewhere to live on C.101/C.102 — an internal read of effective restrictions, an ETag, and an optional `If-Match` | **ACCEPTED by the programme owner, 2026-09-24** | Proposed 2026-08-24, accepted as written. Neither `ETag` nor `If-Match` is defined and the live service returns no version token, so a restriction requested against a stale view is applied rather than refused. There is also no Ops-callable read of effective restrictions at all — C.96 is a customer-principal mailbox route — so `If-Match` cannot be added alone. Needs an Appendix C card from karyalay-mail; the generator must not be taught a special case. **Partly published in `v0.7.0`:** `Restriction.version` and the `ETag` on C.101/C.102. **The read and `If-Match` are not** — karyalay-mail's Appendix C has neither the card nor the C.101/C.102 wording, and the generator is ready for both (see the 2026-09-24 entry below). |
 | ADR-KEM-015 | Accept webmail deltas D-02, D-03, D-07 and D-13 as C.116–C.120 | **ACCEPTED 2026-08-24** | The decision ADR-KEM-010 scheduled and did not take, taken at the point it was scheduled for. Change feed (long-poll, opaque cursor, notifications never content), spam/phishing feedback (closed classification, no oracle in the response), remote-image proxy (the URL must appear in the message — that is what makes it a proxy and not an open SSRF relay), and push register/revoke (transport handle only; a notification says a mailbox has new mail and the client fetches the rest). Published in `v0.6.0`. Unblocks Repo 2 Phase 5's four delta-blocked tasks once Repo 1 implements. |
 | OPEN-001 | Calendar/groupware position vs. Workspace/Zoho competition | **OPEN — product decision** | Master §1.3 excludes it from v1. The exclusion is deliberate; the *competitive* consequence is undecided. Needs a product answer before GA pricing, not before Gate 1. |
 | OPEN-002 | PHP-FPM as the streaming path for the mailbox gateway | **OPEN — deferred** | Concern recorded (process-per-request under large attachment streaming). Revisit with load evidence at Gate 2; premature to redesign now. |
@@ -161,3 +161,27 @@ four share one, so the condition holds. The drift is nonetheless real,
 unexplained by any ADR, and owed a decision: `v0.2.1` → `v0.4.0` crosses
 C.108–C.115, so advancing Repo 3's pin is a change with evidence rather than a
 chore. Recorded here so it is not mistaken for something Gate 0 settled.
+
+## ADR-KEM-013 and ADR-KEM-014 accepted — 2026-09-24
+
+The programme owner accepted both on 2026-09-24, as written. `v0.7.0`
+implements ADR-KEM-013 in full on the contract side and ADR-KEM-014 in part.
+ADR-KEM-005, 006, 007 and 008 are unchanged and remain PROPOSED.
+
+**ADR-KEM-014 is accepted and not finished, and the register should not be
+read as saying otherwise.** Its §3 puts the internal read and the optional
+`If-Match` upstream of this repository, in karyalay-mail's Appendix C, and
+neither card has changed. What `v0.7.0` carries is the version token —
+`Restriction.version` and an `ETag` on C.101/C.102 — so karyalay-mail can start
+returning one; what it does not carry is anywhere to send it back or any way
+to read a DOMAIN or ORGANISATION restriction. The ADR's implementation section
+names the exact card wording the generator now recognises and the four steps
+this repository takes when the cards land.
+
+This is the ADR-KEM-009 shape one step removed — a decision whose completion
+depends on another repository acting — so it is written down here with its
+owner rather than left implicit: **karyalay-mail owns the next move** (a card
+for `listEffectiveRestrictions`, next free id C.121, and "If-Match honoured
+when supplied" on C.101/C.102). It is also recorded as ADR-KEM-014's open
+defect on delta AI-01 in `docs/registers/delta-register-v1.yaml`, which keeps
+AI-01 PARTIAL until it is closed.

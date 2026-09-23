@@ -449,6 +449,10 @@ defines exactly four operations.
   T00.07b. **This is delta AI-01, PARTIAL, and the missing read is one of the
   two defects [ADR-KEM-014](adr/ADR-KEM-014-restriction-precondition-token.md)
   proposes fixing.**
+  *(2026-09-24: ADR-KEM-014 is now ACCEPTED, and PGA-21 still stands. `v0.7.0`
+  publishes only the version token; the read waits on a karyalay-mail
+  Appendix C card and is not in the contract. See the ADR's implementation
+  section.)*
 - **AE #68** — *"new app password + spam spike → **credential revoke**/outbound
   lock"*. `restriction_code` is a closed enum of five values and none revokes a
   credential or a session. **AI-01's third open defect: Ops can block future

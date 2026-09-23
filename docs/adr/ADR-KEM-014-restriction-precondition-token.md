@@ -199,3 +199,61 @@ because the catalog grows by invention otherwise.
   exit criterion this blocks.
 - [`docs/registers/delta-register-v1.yaml`](../registers/delta-register-v1.yaml)
   — delta AI-01 and its three open defects.
+
+## Implementation — `v0.7.0`, 2026-09-24: partial, and why
+
+Added after acceptance; nothing above this heading was changed except the
+status fields and the "Decision" heading, which say so.
+
+**This ADR is not fully implemented, and §3 of it is the reason.** Two of the
+four contract changes live upstream of this repository by the ADR's own
+account, and the upstream has not moved: on 2026-09-24 karyalay-mail's
+Appendix C has no card for the read and the C.101/C.102 cards' Notes are
+unchanged (checked against both the working copy and `origin/main`, which are
+identical). `v0.7.0` publishes what this repository owns and prepares the rest.
+
+| Change | Status | Where / what it waits on |
+| --- | --- | --- |
+| §2 `Restriction.version` | ☑ | Optional string in `tools/derive/openapi_schemas.py`. Everywhere `Restriction` appears: C.96, C.101, C.102 and `Mailbox.restrictions`. |
+| §2 `ETag` on C.101's `202` and C.102's `200` | ☑ | Binding key `etag` in `tools/derive/openapi_ops.py`, naming a new `RestrictionStateETag` header component. Appendix C cards do not tabulate response headers, so this is a representation binding, not a card reinterpretation. |
+| §2 optional `If-Match` on C.101/C.102, and its `412` | ⛔ karyalay-mail Appendix C | The generator is ready and needs no further change: a card whose Notes say **"If-Match honoured when supplied"** gets an optional `If-Match` and `412 VERSION_CONFLICT`. Verified by regenerating against a scratch copy of karyalay-mail's spec with that phrase appended to the C.101 and C.102 Notes: exactly those two parameters and two responses appeared, and nothing else in any document changed. Wording such as "ETag/precondition" would instead match the *required* rule, which this ADR rejects. |
+| §1 `listEffectiveRestrictions` | ⛔ karyalay-mail Appendix C | Needs a card. The ADR said "C.116 at time of writing"; ADR-KEM-015 took C.116–C.120 in `v0.6.0`, so the next free id is C.121 — still karyalay-mail's to assign, with the appendix preamble's count moving 120 → 121. |
+
+### The reading `version` and `ETag` were given
+
+The ADR says `Restriction` gains a `version` and C.101/C.102 gain an `ETag`,
+and that the read's `ETag` is *"the resource's restriction-state version"*. It
+does not say whether `version` is per restriction or per resource. v0.7.0
+publishes both as **the restriction-state version of the restricted resource**,
+one token over every restriction on it, and the same value in both places.
+
+That is the only reading under which the ADR's own scenario is refused. For
+operator B's clear to fail after operator A adds `SEND_BLOCKED`, B's `If-Match`
+on C.102 must be compared against something A's C.101 changed — a restriction
+B never saw has no per-restriction version for B to hold. And C.101 creates a
+restriction, so there is no per-restriction version to send with it at all.
+karyalay-mail should confirm this reading when it implements; if it reads the
+ADR differently, that is a contract change to raise, not a detail to settle in
+code.
+
+### What the contracts side does when the cards land
+
+1. `npm run derive`. The `If-Match` and `412` on C.101/C.102 appear with no
+   code change.
+2. Bind the read in `tools/derive/openapi_ops.py` under the id karyalay-mail
+   assigned: `doc=OPERATIONS`, `op="listEffectiveRestrictions"`, a response
+   schema of the shape `{ restrictions: [Restriction] }` (not a cursor page —
+   the read is scoped to one resource), and `etag="RestrictionStateETag"`.
+3. `QUERY` entries for `resource_type` and `resource_id`. The generator renders
+   an unknown query name as a free string today; `resource_type` should carry
+   the `ORGANISATION | DOMAIN | MAILBOX` enum `Restriction` already uses.
+4. A minor release. Until step 1 runs, `regeneration-is-clean` fails on `main`
+   — by design, and the failure message says what to do.
+
+### What this leaves open
+
+- **AE #85 and PGA-21 stay unsatisfiable** until the read ships: Ops still
+  cannot read a DOMAIN or ORGANISATION restriction back.
+- **Delta AI-01 stays PARTIAL.** Its ADR-KEM-013 defect is closed by
+  `v0.7.0`; this ADR's defect is narrowed to the read and `If-Match`; and the
+  third — Ops cannot end a session an attacker already holds — still has no ADR.

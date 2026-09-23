@@ -13,6 +13,69 @@ patch, a minor or a master-contract revision.
 Consumers pin a tag (Master §0.3). A published tag is never moved — a
 correction ships as the next patch version.
 
+## v0.7.0 — 2026-09-24
+
+**Shared compatible** by the class table: no request karyalay-mail accepts
+today becomes invalid, no response loses a field, and every addition is
+optional. ADR-KEM-013 calls the key half *additive-restrictive*, and that is
+the part a consumer must read: a client regenerated from this tag rejects a
+malformed key locally instead of sending it. It is a minor release rather than
+a patch for exactly that reason.
+
+Implements [ADR-KEM-013](../docs/adr/ADR-KEM-013-idempotency-key-header-pattern.md)
+in full and [ADR-KEM-014](../docs/adr/ADR-KEM-014-restriction-precondition-token.md)
+in part, both accepted by the programme owner on 2026-09-24.
+
+### `Idempotency-Key` — ADR-KEM-013
+
+| Change | Detail |
+| --- | --- |
+| Pattern published | Every `Idempotency-Key` header now carries `pattern: "^[A-Za-z0-9._~-]{1,128}$"` beside the existing `maxLength: 128` — RFC 3986 unreserved characters, the class karyalay-mail §34.1 has always enforced. **40 headers across four documents**: public-control 24, mailbox 11, internal-provisioning 3, operations 2; 8 required, 32 honoured when supplied. The ADR counted 39; C.117 (`reportMessageFeedback`, v0.6.0) is the fortieth. |
+| One key class, checked | The pattern is the action envelope's `idempotency_key` pattern, published in v0.5.0. New harness check: every `Idempotency-Key` header in every OpenAPI document must carry exactly that pattern and `maxLength`, with a negative test that drops the pattern and widens it to admit colons. |
+| Malformed is not missing | Each header's description now states the error selection ADR-KEM-013 decided: an **absent** header is `IDEMPOTENCY_KEY_REQUIRED` (400); a **present header outside the pattern** is `VALIDATION_FAILED` (422) with the header named in the structured validation detail. No error code was added. |
+
+### Restriction precondition token — ADR-KEM-014, the part this repository owns
+
+| Change | Detail |
+| --- | --- |
+| `Restriction.version` | New optional string: the opaque restriction-state version of the restricted resource. Appears wherever `Restriction` does — C.96, C.101, C.102, and inside `Mailbox.restrictions`. |
+| `ETag` on C.101 and C.102 | C.101's `202` and C.102's `200` carry `ETag`, a new `RestrictionStateETag` header component with the same value as `version`. |
+
+### Not in this release, and why
+
+ADR-KEM-014 §1 (`listEffectiveRestrictions`, the internal read) and the
+`If-Match` half of §2 **are not published**. The ADR's own §3 puts both
+upstream of this repository: the read needs an Appendix C card, whose catalog
+id is karyalay-mail's to assign, and the optional `If-Match` must be stated by
+the C.101/C.102 cards rather than taught to the generator as a special case.
+Neither card has changed. The generator now recognises the wording
+*"If-Match honoured when supplied"* in a card's Notes and emits an optional
+`If-Match` plus `412` from it; a scratch regeneration against a copy of the
+karyalay-mail spec with that wording on C.101/C.102 produced exactly that and
+changed nothing else.
+
+### Consumer action
+
+- **karyalay-mail** (serves C.101/C.102): answer a malformed key with
+  `VALIDATION_FAILED` 422, not `IDEMPOTENCY_KEY_REQUIRED`; return `version` and
+  the `ETag`. Then add the Appendix C card for the read and the `If-Match`
+  wording on C.101/C.102, which unblocks the rest of ADR-KEM-014.
+- **karyalay-mail-ops** (calls them): assert the key class in its own key
+  derivation (ADR-OPS-023) and record the `ETag`. Appendix AP.1's example
+  key `case:...:mailbox-lock:v1` is still invalid and is that repository's to fix.
+- **karyalay-webmail**: regenerate the client. Eleven mailbox operations gain
+  the pattern.
+- **karyalay-mail-infra**: C.97, C.99 and C.100 gain the pattern. Its
+  `IdempotencyKey.HeaderValue()` re-encoding (`7f6303f`) was written to satisfy
+  exactly this class; re-pinning makes the contract say what that fix assumed.
+
+### Releases with no entry here
+
+`v0.3.0`, `v0.4.0`, `v0.5.0` and `v0.6.0` have no entry in this file. Their
+changes are recorded in ADR-KEM-010, ADR-KEM-011, ADR-KEM-012 and ADR-KEM-015
+respectively, and in each tag's annotation. This note records the gap; it does
+not fill it.
+
 ## v0.2.1 — 2026-08-18
 
 **Shared compatible.** No shape change. Every schema, operation, enum and

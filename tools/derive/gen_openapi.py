@@ -182,6 +182,40 @@ PARAM_DESCRIPTIONS = {
 
 OPAQUE_PARAMS = {"folder", "message", "part", "thread", "draft", "subscription"}
 
+# The key class karyalay-mail §34.1 enforces: RFC 3986 *unreserved* characters,
+# 1-128. ADR-KEM-013 (ACCEPTED 2026-09-24).
+#
+# Until v0.7.0 both Idempotency-Key branches below published `maxLength: 128`
+# and no pattern, while the server refused everything outside this class -- and
+# refused it as IDEMPOTENCY_KEY_REQUIRED, telling a caller that had plainly sent
+# the header that it was missing. v0.5.0 had already published this exact
+# pattern on the action envelope's `idempotency_key`, so the contract stated the
+# rule in one place and contradicted it in another.
+#
+# One constant, used by both branches. It must equal the pattern in
+# actions/action-envelope-v1.schema.json, and the harness fails the build if any
+# Idempotency-Key header anywhere disagrees with it -- the version.py lesson
+# applied to a second field. `maxLength` is kept beside the pattern on purpose:
+# a client generator that reads only `maxLength` still gets the length bound.
+IDEMPOTENCY_KEY_SCHEMA = {
+    "type": "string",
+    "pattern": "^[A-Za-z0-9._~-]{1,128}$",
+    "maxLength": 128,
+}
+
+# How a present-but-malformed key is answered, and how that differs from an
+# absent one. ADR-KEM-013 decision 3: a malformed header is a request-validation
+# failure, and the catalog already has the code for it. No new code is minted.
+IDEMPOTENCY_KEY_CLASS_NOTE = (
+    "RFC 3986 unreserved characters only (`A-Za-z0-9._~-`), 1-128: the class "
+    "Repo 1 §34.1 enforces, and the same pattern as the action envelope's "
+    "`idempotency_key` (ADR-KEM-013). A colon, slash or space is outside it, so "
+    "a key shaped like a path or a URN is refused. A header that is present but "
+    "outside the pattern is VALIDATION_FAILED (422) with the header named in the "
+    "structured validation detail -- never IDEMPOTENCY_KEY_REQUIRED, which means "
+    "the header is absent."
+)
+
 
 def load_error_catalog():
     """Read the codes back out of the generated YAML.
@@ -337,6 +371,10 @@ def components(doc_key, catalog):
     headers = {
         "RequestId": {"description": "Echo of the accepted or generated `X-Request-ID` (Repo 1 §26, Master §20.7).", "schema": {"type": "string", "maxLength": 128}},
         "ETag": {"description": "Optimistic concurrency token. Supply it as `If-Match` on the next update (Master §20.6).", "schema": {"type": "string"}},
+        "RestrictionStateETag": {
+            "description": "The restricted resource's restriction-state version (ADR-KEM-014): one opaque token over every restriction on the resource named by `resource_type`/`resource_id`, so a change to any of them changes it. The same value as `version` on the Restriction in the body. It is the token OPS-BND-002's expected precondition carries. Compare it for equality only; never parse or construct it.",
+            "schema": {"type": "string"},
+        },
         "RetryAfter": {"description": "Delay before retrying, for codes in the RETRY_AFTER class (Repo 1 §39).", "schema": {"type": "integer", "minimum": 0}},
     }
 
@@ -447,6 +485,26 @@ def build_operation(card, binding, catalog_codes):
                 "schema": {"type": "string"},
             }
         )
+    elif re.search(r"If-Match (?:optional|honou?red when supplied)", notes, re.I):
+        # The optional form, declared by the card rather than implied by the
+        # method. ADR-KEM-014 needs exactly this on C.101 (POST) and C.102
+        # (DELETE): an If-Match that is honoured when supplied and not
+        # required, because the one existing caller has no token to send until
+        # the version token ships. The method rule below only covers PUT/PATCH,
+        # and the required rule above would publish a header no caller can yet
+        # populate -- "a required header nobody can populate is not a stronger
+        # contract; it is an outage." So the card states it and this reads it;
+        # the generator is not taught a C.101 special case (specmd.py forbids
+        # reinterpreting a card). The 412 follows automatically below.
+        operation.setdefault("parameters", []).append(
+            {
+                "name": "If-Match",
+                "in": "header",
+                "required": False,
+                "description": "Declared by this operation's Appendix C card: honoured when supplied, not required (Master §20.6). A value that no longer matches the current version returns VERSION_CONFLICT (412) instead of applying the change against a stale view.",
+                "schema": {"type": "string"},
+            }
+        )
     elif method in {"put", "patch"}:
         operation.setdefault("parameters", []).append(
             {
@@ -495,8 +553,8 @@ def build_operation(card, binding, catalog_codes):
                 "name": "Idempotency-Key",
                 "in": "header",
                 "required": True,
-                "description": "Required by this operation's Appendix C card. Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1).",
-                "schema": {"type": "string", "maxLength": 128},
+                "description": "Required by this operation's Appendix C card; an absent header is IDEMPOTENCY_KEY_REQUIRED (400). Caller scope plus key maps to one request fingerprint and outcome for the retention window; the same key with a different canonical request is IDEMPOTENCY_KEY_REUSED (Master §20.5, §24.3, Repo 1 §34.1).\n\n" + IDEMPOTENCY_KEY_CLASS_NOTE,
+                "schema": dict(IDEMPOTENCY_KEY_SCHEMA),
             }
         )
     elif method == "post" and not binding.get("unauthenticated"):
@@ -505,8 +563,8 @@ def build_operation(card, binding, catalog_codes):
                 "name": "Idempotency-Key",
                 "in": "header",
                 "required": False,
-                "description": "Honoured when supplied (Master §20.5).",
-                "schema": {"type": "string", "maxLength": 128},
+                "description": "Honoured when supplied (Master §20.5).\n\n" + IDEMPOTENCY_KEY_CLASS_NOTE,
+                "schema": dict(IDEMPOTENCY_KEY_SCHEMA),
             }
         )
 
@@ -537,7 +595,14 @@ def build_operation(card, binding, catalog_codes):
     # --- responses ---------------------------------------------------------
     status = binding.get("status", 200)
     success_headers = {"X-Request-ID": {"$ref": "#/components/headers/RequestId"}}
-    if method in {"get", "put", "patch"} and binding.get("res") and not binding.get("list") and not binding.get("binary"):
+    if binding.get("etag"):
+        # A binding that names its own ETag component: the token is not the
+        # representation's own version but something the binding states.
+        # ADR-KEM-014 -- C.101's 202 and C.102's 200 carry the restricted
+        # resource's restriction-state version, which is what a later
+        # If-Match on either operation is compared against.
+        success_headers["ETag"] = {"$ref": "#/components/headers/%s" % binding["etag"]}
+    elif method in {"get", "put", "patch"} and binding.get("res") and not binding.get("list") and not binding.get("binary"):
         success_headers["ETag"] = {"$ref": "#/components/headers/ETag"}
 
     if binding.get("binary"):

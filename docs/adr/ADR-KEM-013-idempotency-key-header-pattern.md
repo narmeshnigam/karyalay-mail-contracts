@@ -190,3 +190,32 @@ the same class of defect as hand-editing a converged host.
 - `tools/derive/version.py` — the one-source rule this applies to a second field.
 - [`docs/registers/delta-register-v1.yaml`](../registers/delta-register-v1.yaml)
   — delta AI-01, PARTIAL, with this defect recorded against it.
+
+## Implementation — `v0.7.0`, 2026-09-24
+
+Added after acceptance; nothing above this heading was changed except the
+status fields and the "Decision" heading, which say so.
+
+| Decision | Done | Where |
+| --- | --- | --- |
+| 1. The generator, not the YAML | ☑ | `IDEMPOTENCY_KEY_SCHEMA` in `tools/derive/gen_openapi.py`, used by both the required and the honoured-when-supplied branch, then `npm run derive`. No YAML was hand-edited. |
+| 2. One constant, and a check that it equals the envelope's | ☑ | `tools/validate/validate.mjs`: *every Idempotency-Key header carries the action envelope key pattern*. Also compares `maxLength`. A negative test drops the pattern (the v0.6.0 shape) and widens it to admit colons; both are rejected. Run against the v0.6.0 documents the check fails, naming every header. |
+| 3. karyalay-mail stops misdescribing the failure | ☑ published · ☐ served | Every header's description now states the selection: absent → `IDEMPOTENCY_KEY_REQUIRED` (400); present and outside the pattern → `VALIDATION_FAILED` (422), header named in the structured detail. The 422 was already in every affected operation's response set. Making the service answer that way is karyalay-mail's, as this ADR said. |
+| 4. Appendix AP.1's example | — not this repository's | Unchanged in karyalay-mail-ops. No example key in this repository violates the pattern: the only occurrences of `case:...:mailbox-lock:v1` here are the `$comment`s in the action envelope that quote it as the thing that is refused. |
+
+**The count was 40, not 39.** Consequences counted 39 declarations. `v0.6.0`
+added C.117 `reportMessageFeedback`, a POST in the mailbox document, after this
+ADR was written; its honoured-when-supplied header is the fortieth. By
+document: public-control 24, mailbox 11, internal-provisioning 3,
+operations 2. Eight required, 32 honoured when supplied.
+
+**Scope, as karyalay-mail-infra asked.** Its run notes and ADR-INF-039 asked
+for this to reach `internal-provisioning-api-v1.yaml` as well as the
+operations document. It does: the generator emits every document, so all
+three internal-provisioning headers (C.97, C.99, C.100) carry the pattern.
+
+**One place still describes the key loosely.** `observability/telemetry-contract-v1.yaml`
+gives the `idempotency_key` correlation identifier the format *"Opaque
+client-supplied string, max 128 characters"*. That is not wrong, only less
+specific than §34.1, and it is a hand-authored transcription of Master §20.5
+prose that this ADR does not name. Left as it is and recorded here.

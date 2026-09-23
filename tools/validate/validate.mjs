@@ -15,6 +15,7 @@
  *   9. no deferral's target tag has passed with the deferred thing absent
  *  10. the delta register projects all three appendices and every claim resolves
  *  11. every task's frontmatter status matches the glyph in its phase index
+ *  12. every Idempotency-Key header carries the action envelope's key pattern
  *
  * Exit code is the number of failures, capped at 250.
  */
@@ -398,6 +399,93 @@ check('the inlined action envelope matches actions/action-envelope-v1.schema.jso
     throw new Error('the inlined observed_state has drifted from the schema file')
   }
   return `${Object.keys(schema.properties).length} envelope fields, matched`
+})
+
+// ------------------------------------------- 12. one idempotency key class
+//
+// ADR-KEM-013 (ACCEPTED 2026-09-24), decision 2: "the pattern on every
+// `Idempotency-Key` header equals the pattern on the envelope's
+// `idempotency_key`." Until v0.7.0 the headers published maxLength and no
+// pattern while the envelope published the class karyalay-mail §34.1 enforces,
+// so one contract stated the rule in one place and contradicted it in another.
+// Two sources for one key format will disagree the way eight sources for one
+// version number did (tools/derive/version.py).
+
+function idempotencyKeyHeaders(doc) {
+  const found = []
+  const resolve = (param) => {
+    if (param && typeof param.$ref === 'string' && param.$ref.startsWith('#/components/parameters/')) {
+      return doc.components?.parameters?.[param.$ref.split('/').pop()]
+    }
+    return param
+  }
+  const METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'])
+  for (const [p, item] of Object.entries(doc.paths || {})) {
+    for (const [method, op] of Object.entries(item || {})) {
+      if (!METHODS.has(method)) continue
+      for (const raw of [...(item.parameters || []), ...(op?.parameters || [])]) {
+        const param = resolve(raw)
+        if (param?.in === 'header' && String(param.name).toLowerCase() === 'idempotency-key') {
+          found.push({ where: `${op?.operationId ?? method.toUpperCase() + ' ' + p}`, param })
+        }
+      }
+    }
+  }
+  return found
+}
+
+function auditIdempotencyKeyClass(docs, envelopeKey) {
+  const problems = []
+  let counted = 0
+  let required = 0
+  for (const [file, doc] of docs) {
+    for (const { where, param } of idempotencyKeyHeaders(doc)) {
+      counted++
+      if (param.required) required++
+      const schema = param.schema || {}
+      if (schema.pattern !== envelopeKey.pattern) {
+        problems.push(`${file} ${where}: Idempotency-Key pattern is ${JSON.stringify(schema.pattern ?? null)}; the action envelope's idempotency_key is ${JSON.stringify(envelopeKey.pattern)}`)
+      }
+      if (schema.maxLength !== envelopeKey.maxLength) {
+        problems.push(`${file} ${where}: Idempotency-Key maxLength is ${schema.maxLength ?? 'absent'}; the envelope's is ${envelopeKey.maxLength}`)
+      }
+    }
+  }
+  return { problems, counted, required }
+}
+
+const envelopeKey = loadJson('actions/action-envelope-v1.schema.json').properties.idempotency_key
+
+check('every Idempotency-Key header carries the action envelope key pattern (ADR-KEM-013)', () => {
+  if (!envelopeKey?.pattern) throw new Error('actions/action-envelope-v1.schema.json publishes no idempotency_key pattern, so there is nothing to hold the headers to')
+  const docs = openapiFiles.map((f) => [f, loadYaml(f)])
+  const { problems, counted, required } = auditIdempotencyKeyClass(docs, envelopeKey)
+  if (problems.length) throw new Error(problems.slice(0, 12).join('\n') + (problems.length > 12 ? `\n... and ${problems.length - 12} more` : ''))
+  // Non-vacuity. A header renamed or moved where this walk does not look would
+  // otherwise pass by inspecting nothing -- the error-code check's old failure.
+  if (required === 0 || counted === required) {
+    throw new Error(`found ${counted} Idempotency-Key header(s), ${required} required; both the required and the honoured-when-supplied form exist, so the walk is not finding them`)
+  }
+  return `${counted} headers (${required} required, ${counted - required} honoured when supplied), all ${envelopeKey.pattern}`
+})
+
+check('a header whose key pattern drifts from the envelope is caught (negative test)', () => {
+  const doc = loadYaml('openapi/operations-api-v1.yaml')
+  const headers = idempotencyKeyHeaders(doc)
+  if (headers.length === 0) throw new Error('operations-api-v1.yaml has no Idempotency-Key header to mutate')
+  // The v0.6.0 shape: maxLength and no pattern.
+  const dropped = structuredClone(doc)
+  delete idempotencyKeyHeaders(dropped)[0].param.schema.pattern
+  if (!auditIdempotencyKeyClass([['mutated', dropped]], envelopeKey).problems.some((m) => m.includes('pattern is null'))) {
+    throw new Error('accepted a header with no pattern -- the exact contract v0.6.0 published')
+  }
+  // A widened class: colons admitted, which is what AP.1's example key needed.
+  const widened = structuredClone(doc)
+  idempotencyKeyHeaders(widened)[0].param.schema.pattern = '^[A-Za-z0-9._~:-]{1,128}$'
+  if (auditIdempotencyKeyClass([['mutated', widened]], envelopeKey).problems.length === 0) {
+    throw new Error('accepted a header whose pattern admits colons')
+  }
+  return 'a dropped pattern and a widened pattern both rejected'
 })
 
 check('no OpenAPI document names an error code the catalog does not define', () => {

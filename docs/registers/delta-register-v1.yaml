@@ -81,16 +81,13 @@ sources:
             operation_id: clearRestriction
             catalog_id: C.102
         open_defects:
-          - ref: ADR-KEM-013
-            summary: >-
-              The `Idempotency-Key` header on C.101 carries maxLength and no
-              pattern, while karyalay-mail enforces RFC 3986 unreserved
-              characters and reports a malformed key as a MISSING one.
           - ref: ADR-KEM-014
             summary: >-
-              Neither ETag nor If-Match is defined on C.101/C.102 and the live
-              service returns no version token, so the OPS-BND-002 precondition
-              has nowhere to be enforced.
+              Narrowed in v0.7.0, not closed. The version token is published
+              (Restriction.version, and an ETag on C.101/C.102), but there is
+              still no If-Match to send it back on and no Ops-callable read of
+              effective restrictions, so the OPS-BND-002 precondition cannot yet
+              be enforced. Both wait on karyalay-mail's Appendix C cards.
           - ref: null
             summary: >-
               Containment is incomplete. The row asks for session and
@@ -98,6 +95,14 @@ sources:
               under /api/v1. Ops can block future authentication and cannot end
               a session an attacker already holds. Recorded in
               karyalay-mail-ops T00.07b evidence; no ADR raised.
+        note: >-
+          2026-09-24: ADR-KEM-013 and ADR-KEM-014 accepted. ADR-KEM-013's defect
+          (the Idempotency-Key header published maxLength and no pattern, and a
+          malformed key was reported as a missing one) was removed from
+          open_defects because v0.7.0 publishes the pattern on every header and
+          the absent-vs-malformed selection in each description; karyalay-mail
+          still owes serving VALIDATION_FAILED. ADR-KEM-014's defect was
+          narrowed rather than removed.
 
       - id: AI-02
         owner: karyalay-mail
