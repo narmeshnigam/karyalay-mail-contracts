@@ -2,11 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **PROPOSED 2026-08-24** |
+| Status | **ACCEPTED 2026-09-24** — accepted by the programme owner (proposed 2026-08-24) |
 | Date | 2026-08-24 |
 | Raised by | karyalay-mail-ops `T00.07b`, confirmed against a running karyalay-mail |
 | Affects | `openapi/operations-api-v1.yaml` (C.101, C.102) and a new internal read; karyalay-mail Appendix C cards for C.101/C.102 and §36; karyalay-mail-ops `internal/repo1client`; Appendix AI delta AI-01; Repo 4 AE #84, #85 |
-| Approvers | Programme owner — **not yet reviewed** |
+| Approvers | Programme owner — **accepted 2026-09-24** |
 
 ## Context
 
@@ -68,7 +68,10 @@ it because it cannot ask. **AE #84** — *"action HTTP timeout uncertain →
 reconcile before retry"* — is answered today by idempotent replay rather than by
 reading state, which is a different thing wearing the same result.
 
-## Decision (proposed)
+## Decision
+
+*Accepted as written by the programme owner on 2026-09-24. Until then this
+heading read "Decision (proposed)"; the text beneath it is unchanged.*
 
 **Three changes, and all three are needed for any of them to be useful.**
 

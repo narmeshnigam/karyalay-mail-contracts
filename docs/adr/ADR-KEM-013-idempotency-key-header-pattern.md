@@ -2,11 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **PROPOSED 2026-08-24** |
+| Status | **ACCEPTED 2026-09-24** — accepted by the programme owner (proposed 2026-08-24) |
 | Date | 2026-08-24 |
 | Raised by | karyalay-mail-ops `T00.07b`, from a live run against a running karyalay-mail |
 | Affects | `tools/derive/gen_openapi.py`; 39 header declarations across four OpenAPI documents; every generated client; karyalay-mail §34.1's error selection |
-| Approvers | Programme owner — **not yet reviewed** |
+| Approvers | Programme owner — **accepted 2026-09-24** |
 
 ## Context
 
@@ -64,7 +64,10 @@ states the rule in one place and contradicts itself in another**, which is
 worse than not stating it at all: a client generated from `operations-api-v1.yaml`
 sees `maxLength: 128` and believes it.
 
-## Decision (proposed)
+## Decision
+
+*Accepted as written by the programme owner on 2026-09-24. Until then this
+heading read "Decision (proposed)"; the text beneath it is unchanged.*
 
 **Publish the pattern on the header, from the one place that emits it.**
 
