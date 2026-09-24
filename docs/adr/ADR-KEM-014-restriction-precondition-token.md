@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **ACCEPTED 2026-09-24** — accepted by the programme owner (proposed 2026-08-24) |
+| Status | **ACCEPTED 2026-09-24** — accepted by the programme owner (proposed 2026-08-24). **Implemented**: contracts `v0.7.0` (version token) and `v0.8.0` (read, `If-Match`) |
 | Date | 2026-08-24 |
 | Raised by | karyalay-mail-ops `T00.07b`, confirmed against a running karyalay-mail |
 | Affects | `openapi/operations-api-v1.yaml` (C.101, C.102) and a new internal read; karyalay-mail Appendix C cards for C.101/C.102 and §36; karyalay-mail-ops `internal/repo1client`; Appendix AI delta AI-01; Repo 4 AE #84, #85 |
@@ -202,6 +202,10 @@ because the catalog grows by invention otherwise.
 
 ## Implementation — `v0.7.0`, 2026-09-24: partial, and why
 
+*Superseded the same day by the `v0.8.0` section at the end: karyalay-mail
+landed both cards, and the ADR is now fully implemented in the contract. This
+section is kept as written, apart from the two table rows that say so.*
+
 Added after acceptance; nothing above this heading was changed except the
 status fields and the "Decision" heading, which say so.
 
@@ -216,8 +220,8 @@ identical). `v0.7.0` publishes what this repository owns and prepares the rest.
 | --- | --- | --- |
 | §2 `Restriction.version` | ☑ | Optional string in `tools/derive/openapi_schemas.py`. Everywhere `Restriction` appears: C.96, C.101, C.102 and `Mailbox.restrictions`. |
 | §2 `ETag` on C.101's `202` and C.102's `200` | ☑ | Binding key `etag` in `tools/derive/openapi_ops.py`, naming a new `RestrictionStateETag` header component. Appendix C cards do not tabulate response headers, so this is a representation binding, not a card reinterpretation. |
-| §2 optional `If-Match` on C.101/C.102, and its `412` | ⛔ karyalay-mail Appendix C | The generator is ready and needs no further change: a card whose Notes say **"If-Match honoured when supplied"** gets an optional `If-Match` and `412 VERSION_CONFLICT`. Verified by regenerating against a scratch copy of karyalay-mail's spec with that phrase appended to the C.101 and C.102 Notes: exactly those two parameters and two responses appeared, and nothing else in any document changed. Wording such as "ETag/precondition" would instead match the *required* rule, which this ADR rejects. |
-| §1 `listEffectiveRestrictions` | ⛔ karyalay-mail Appendix C | Needs a card. The ADR said "C.116 at time of writing"; ADR-KEM-015 took C.116–C.120 in `v0.6.0`, so the next free id is C.121 — still karyalay-mail's to assign, with the appendix preamble's count moving 120 → 121. |
+| §2 optional `If-Match` on C.101/C.102, and its `412` | ☑ `v0.8.0` | karyalay-mail `0a06075` added the wording to both cards; `npm run derive` emitted `If-Match` (`required: false`) and `412` on both, with no code change. *(Read ⛔ in `v0.7.0`, waiting on the card, as follows:)* The generator is ready and needs no further change: a card whose Notes say **"If-Match honoured when supplied"** gets an optional `If-Match` and `412 VERSION_CONFLICT`. Verified by regenerating against a scratch copy of karyalay-mail's spec with that phrase appended to the C.101 and C.102 Notes: exactly those two parameters and two responses appeared, and nothing else in any document changed. Wording such as "ETag/precondition" would instead match the *required* rule, which this ADR rejects. |
+| §1 `listEffectiveRestrictions` | ☑ `v0.8.0` | C.121 `GET /internal/v1/ops/restrictions`, carded by karyalay-mail `0a06075`. *(Read ⛔ in `v0.7.0`, as follows:)* Needs a card. The ADR said "C.116 at time of writing"; ADR-KEM-015 took C.116–C.120 in `v0.6.0`, so the next free id is C.121 — still karyalay-mail's to assign, with the appendix preamble's count moving 120 → 121. |
 
 ### The reading `version` and `ETag` were given
 
@@ -257,3 +261,36 @@ code.
 - **Delta AI-01 stays PARTIAL.** Its ADR-KEM-013 defect is closed by
   `v0.7.0`; this ADR's defect is narrowed to the read and `If-Match`; and the
   third — Ops cannot end a session an attacker already holds — still has no ADR.
+
+## Implementation — `v0.8.0`, 2026-09-24: complete
+
+Added the same day, after karyalay-mail landed its half: `0a06075` (Appendix C
+only — C.121 carded, and "If-Match honoured when supplied" on C.101 and C.102)
+and `ac91510` (the implementation). The table above has its two ⛔ rows
+changed to ☑ and says what they read before. Regenerated against the
+karyalay-mail spec at `ac91510` — the same bytes as its `origin/main`, which is
+what `regeneration-is-clean` clones.
+
+| Change | Status | Where |
+| --- | --- | --- |
+| §1 C.121 `listEffectiveRestrictions` | ☑ | `operations-api-v1.yaml`. `resource_type` (the `ORGANISATION \| DOMAIN \| MAILBOX` enum, read from `Restriction` rather than written a second time) and `resource_id` (`uuid`) are both `required: true`, as the card says. Returns `EffectiveRestrictions` = `{restrictions: [Restriction]}`, unpaged, with `RestrictionStateETag`. `422` is in its response set: an internal read that takes a query can fail query validation, and the generator now says so for any such operation (C.121 is the only one). |
+| §2 optional `If-Match` + `412` on C.101/C.102 | ☑ | Emitted from the cards, as §3 required. The generator was not changed for it. |
+| §3 the generator, not a special case | ☑ | The only generator changes are general: `QUERY` entries may state `required`, a description and `enum_from`, and a query-taking operation gets `422`. |
+
+**Steps 1–4 of "What the contracts side does when the cards land" above are
+done**, as written, with one addition: the generic query renderer could not
+be taught a meaning for the bare name `resource_type`, because C.92's audit
+filter uses the same name for a different vocabulary. The entry carries its
+own enum instead.
+
+**The reading of `version` is confirmed.** karyalay-mail `ac91510` implements
+it as one token over every restriction on the resource, and its C.101/C.102
+cards now say so in their own words. One precision the v0.7.0 descriptions
+lacked: the `ETag` is the **quoted** strong entity-tag form of `version`
+(`version` `abc` → `ETag: "abc"`), which is how the service writes it. The
+descriptions now say so, and tell a caller to send the `ETag` back as received.
+
+**What this closes.** Delta AI-01 loses its ADR-KEM-014 defect. It stays
+PARTIAL on the third, which still has no ADR: Ops cannot end a session an
+attacker already holds. AE #85 now has a read to call; PGA-21's other member,
+AE #68, is that same unraised defect.

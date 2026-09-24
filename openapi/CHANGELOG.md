@@ -13,6 +13,39 @@ patch, a minor or a master-contract revision.
 Consumers pin a tag (Master §0.3). A published tag is never moved — a
 correction ships as the next patch version.
 
+## v0.8.0 — 2026-09-24
+
+**Shared compatible.** One operation added; an optional request header and a
+`412` response on two existing ones. Nothing existing becomes invalid.
+
+Completes [ADR-KEM-014](../docs/adr/ADR-KEM-014-restriction-precondition-token.md).
+`v0.7.0` published the version token and could publish nothing more, because
+the rest lived in karyalay-mail's Appendix C. karyalay-mail `0a06075` carded
+both halves; this release regenerates from that spec (at `ac91510`, its
+`origin/main`).
+
+| Change | Detail |
+| --- | --- |
+| C.121 `listEffectiveRestrictions` | New. `GET /internal/v1/ops/restrictions?resource_type=&resource_id=`, permission `platform.restrict`, in `operations-api-v1.yaml` (4 → 5 operations; Appendix C 120 → 121). Both query parameters required; `resource_type` is `ORGANISATION \| DOMAIN \| MAILBOX`, `resource_id` a `uuid`. Returns `EffectiveRestrictions` — `{restrictions: [Restriction]}`, unpaged — with the `RestrictionStateETag`. Responses include `422` (bad or unknown query parameter) and `404` (`AUTHZ_RESOURCE_NOT_VISIBLE` for a missing, malformed, unknown or deleted `resource_id`, so the read is not an enumerator). |
+| `If-Match` on C.101 and C.102 | New, **optional** (`required: false`), with `412` (`VERSION_CONFLICT`). Emitted from the cards' "If-Match honoured when supplied"; the generator gained no special case. |
+| ETag wording | `RestrictionStateETag` and `Restriction.version` now say the ETag is the **quoted** entity-tag form of `version`, and to send it back as received. v0.7.0 said "the same value", which was imprecise. |
+
+Generator: a `QUERY` entry may now state `required`, a description and
+`enum_from` (a vocabulary reused from a schema), and any operation that takes
+a query parameter lists `422`. Both are general; C.121 is the only operation
+either changes. The hand-kept operation counts in `gen_openapi.py`'s docstring,
+stale since `v0.3.0`, are replaced by the ranges alone.
+
+### Consumer action
+
+- **karyalay-mail**: already serves all three (`ac91510`). Re-pinning makes its
+  served-operations check see C.121 in the contract.
+- **karyalay-mail-ops**: read C.121 before a C.101/C.102 and send its `ETag` as
+  `If-Match`; a `412` means reconcile and re-read, not retry. This is what
+  AE #85 needed. Not doing so is still valid — the header is optional.
+- **karyalay-webmail**, **karyalay-mail-infra**: no change to anything they
+  call; re-pin for the digests.
+
 ## v0.7.0 — 2026-09-24
 
 **Shared compatible** by the class table: no request karyalay-mail accepts

@@ -453,6 +453,10 @@ defines exactly four operations.
   publishes only the version token; the read waits on a karyalay-mail
   Appendix C card and is not in the contract. See the ADR's implementation
   section.)*
+  *(Later on 2026-09-24, `v0.8.0`: the read is published as C.121
+  `listEffectiveRestrictions` and karyalay-mail serves it, so **AE #85 now has a
+  contract surface**; karyalay-mail-ops still has to call it. PGA-21 stands on
+  AE #68 alone, which is AI-01's unraised defect below.)*
 - **AE #68** — *"new app password + spam spike → **credential revoke**/outbound
   lock"*. `restriction_code` is a closed enum of five values and none revokes a
   credential or a session. **AI-01's third open defect: Ops can block future

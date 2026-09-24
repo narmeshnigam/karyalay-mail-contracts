@@ -1,7 +1,7 @@
 """C-number -> request/response binding for the OpenAPI documents.
 
 Appendix C fixes the method, path, purpose, permission and per-endpoint notes
-of all 107 operations. It does not tabulate bodies, so this table binds each
+of every operation. It does not tabulate bodies, so this table binds each
 operation to a representation from openapi_schemas.py. Every binding is
 traceable to the card's Purpose line plus the Appendix A table that owns the
 resource; nothing here contradicts a card.
@@ -166,10 +166,20 @@ OPS = {
     "C.118": dict(doc=MAILBOX, op="getMessageRemoteContent", binary=True, inline=True),
     "C.119": dict(doc=PUBLIC, op="registerPushSubscription", req="PushSubscription", res="PushSubscriptionRecord"),
     "C.120": dict(doc=PUBLIC, op="revokePushSubscription", status=204),
+    # --- ADR-KEM-014 §1: the read that populates C.101/C.102's If-Match ---
+    # Not a cursor page: the card bounds it by construction (at most one live
+    # restriction per code and source, so twenty at most) and a paged read
+    # could not carry one version over rows it had not all returned.
+    "C.121": dict(doc=OPERATIONS, op="listEffectiveRestrictions", res="EffectiveRestrictions", etag="RestrictionStateETag"),
 }
 
 # Query parameters that a card's Notes name explicitly. Nothing is added that a
 # card does not mention: an invented filter is an invented contract.
+#
+# An entry is a bare name, rendered by gen_openapi.query_parameters' generic
+# rules, or a dict when the card says more than the name: `required`, a
+# `description`, and `enum_from` = (schema, property) to reuse a vocabulary a
+# schema already publishes rather than write it out a second time.
 QUERY = {
     "C.4": ["cursor", "limit"],
     "C.6": ["cursor", "limit", "state", "q"],
@@ -197,4 +207,21 @@ QUERY = {
     # The URL to proxy. Validated as one this message actually references --
     # that check is what makes C.118 a proxy rather than an open SSRF relay.
     "C.118": ["url"],
+    # Both REQUIRED by the card, and `resource_type` is the three-value
+    # vocabulary `Restriction` already publishes -- not C.92's audit
+    # `resource_type`, which is a different set under the same name, so the
+    # generic renderer cannot be taught one meaning for the bare name.
+    "C.121": [
+        dict(
+            name="resource_type",
+            required=True,
+            enum_from=("Restriction", "resource_type"),
+            description="Type of the resource whose restrictions to read. Required; a missing or unknown value is VALIDATION_FAILED (422) with the parameter named (C.121 notes).",
+        ),
+        dict(
+            name="resource_id",
+            required=True,
+            description="The resource, which must be of `resource_type`. Required. A missing, malformed, unknown or deleted id answers exactly as C.101 answers one -- AUTHZ_RESOURCE_NOT_VISIBLE -- so the read is not an enumerator (C.121 notes).",
+        ),
+    ],
 }

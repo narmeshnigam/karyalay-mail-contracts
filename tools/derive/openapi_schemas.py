@@ -361,7 +361,7 @@ SCHEMAS = {
             # yet populate would break every response.
             "version": {
                 "type": "string",
-                "description": "Opaque restriction-state version of the restricted resource (`resource_type`/`resource_id`) as of this representation. Where the response carries an ETag (C.101, C.102) this is the same value. It is the token a caller supplies back as a precondition (ADR-KEM-014, OPS-BND-002). Compare it for equality only; never parse or construct it.",
+                "description": "Opaque restriction-state version of the restricted resource (`resource_type`/`resource_id`) as of this representation. Where the response carries an ETag (C.101, C.102, C.121) the ETag is this value as a quoted entity-tag. It is the token a caller supplies back as a precondition (ADR-KEM-014, OPS-BND-002). Compare it for equality only; never parse or construct it.",
             },
         },
         ["restriction_id", "resource_type", "resource_id", "restriction_code", "starts_at"],
@@ -1321,6 +1321,12 @@ SCHEMAS = {
         },
         ["generation", "outcome", "finished_at", "source_service"],
         "Repo 1 §29.2, §29.3",
+    ),
+    "EffectiveRestrictions": _obj(
+        "The restrictions in force now on exactly one resource -- not cleared, started, not expired -- and nothing inherited from its parents. Unpaged: the card bounds it by construction. Every item's `version` equals the response ETag's value, so the rows and the token describe one state (C.121 notes, ADR-KEM-014 §1).",
+        {"restrictions": {"type": "array", "items": {"$ref": "#/components/schemas/Restriction"}}},
+        ["restrictions"],
+        "Repo 1 Appendix C.121; ADR-KEM-014 §1",
     ),
     "RestrictionRequest": _obj(
         "Request a typed restriction. Repo 4 requests; Repo 1 decides and applies (OPS-BND-001).",

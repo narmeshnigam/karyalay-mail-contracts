@@ -8,14 +8,14 @@
 openapi: 3.1.0
 info:
   title: "Karyalay Mail — operations API"
-  version: 0.7.0
+  version: 0.8.0
   summary: "The typed restriction, diagnostics and security-signal surface karyalay-mail-ops calls. Ops requests; karyalay-mail decides and applies."
-  description: "The typed restriction, diagnostics and security-signal surface karyalay-mail-ops calls. Ops requests; karyalay-mail decides and applies.\n\n**Source:** karyalay-mail repository-spec-v1.0 §30, Appendix C.101-C.104; karyalay-mail-ops Appendix AI.\n**Audience:** karyalay-mail-ops service identities. Not a public route (Repo 1 §29.2).\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 4 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
+  description: "The typed restriction, diagnostics and security-signal surface karyalay-mail-ops calls. Ops requests; karyalay-mail decides and applies.\n\n**Source:** karyalay-mail repository-spec-v1.0 §30, Appendix C.101-C.104 and C.121; karyalay-mail-ops Appendix AI.\n**Audience:** karyalay-mail-ops service identities. Not a public route (Repo 1 §29.2).\n\nAppendix C is exhaustive by invariant: no undocumented route may be exposed in production. Operation count in this document is 5 and every operation carries `x-karyalay-catalog-id`, so the reconciliation against the appendix is mechanical.\n\nConventions (Repo 1 §26, Master §20): base path `/api/v1` or `/internal/v1`; snake_case JSON; RFC 3339 UTC timestamps; opaque cursor pagination; `X-Request-ID` accepted or generated and echoed; W3C `traceparent` propagated; `Idempotency-Key` on documented replay-sensitive operations; ETag/`If-Match` on documented versioned updates; `application/problem+json` errors carrying a stable `code`."
   license:
     name: "Proprietary — Karyalay"
     identifier: LicenseRef-Karyalay-Proprietary
   x-karyalay-contract: karyalay-mail-contracts
-  x-karyalay-contract-version: 0.7.0
+  x-karyalay-contract-version: 0.8.0
 servers:
   - url: https://internal.mail.karyalay.in
     description: Production.
@@ -34,12 +34,18 @@ paths:
     post:
       operationId: requestRestriction
       summary: Apply typed restriction from Ops.
-      description: "Apply typed restriction from Ops.\n\n**Catalog:** Appendix C C.101. **Permission:** `platform.restrict`.\n\n**Notes:** Service auth, reason, evidence/case ref, idempotency required.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      description: "Apply typed restriction from Ops.\n\n**Catalog:** Appendix C C.101. **Permission:** `platform.restrict`.\n\n**Notes:** Service auth, reason, evidence/case ref, idempotency required. If-Match honoured when supplied (ADR-KEM-014): its value is the restricted resource's restriction-state version -- the ETag of C.121, of an earlier C.101 or C.102 on the same resource, or `Restriction.version` -- and a value that no longer matches is VERSION_CONFLICT with nothing applied. The 202 carries the resource's new restriction-state version as its ETag and as `version` on the returned restriction.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
       tags:
         - Restrictions
       x-karyalay-catalog-id: C.101
       x-karyalay-permission: platform.restrict
       parameters:
+        - name: If-Match
+          in: header
+          required: false
+          description: "Declared by this operation's Appendix C card: honoured when supplied, not required (Master §20.6). Send the ETag as received. A value that no longer matches the current version returns VERSION_CONFLICT (412) instead of applying the change against a stale view."
+          schema:
+            type: string
         - name: Idempotency-Key
           in: header
           required: true
@@ -76,6 +82,8 @@ paths:
           "$ref": "#/components/responses/E404"
         "409":
           "$ref": "#/components/responses/E409"
+        "412":
+          "$ref": "#/components/responses/E412"
         "413":
           "$ref": "#/components/responses/E413"
         "415":
@@ -88,11 +96,63 @@ paths:
           "$ref": "#/components/responses/E500"
         "503":
           "$ref": "#/components/responses/E503"
+    get:
+      operationId: listEffectiveRestrictions
+      summary: "Read the restrictions in force on one resource, and that resource's restriction-state version, for Ops."
+      description: "Read the restrictions in force on one resource, and that resource's restriction-state version, for Ops.\n\n**Catalog:** Appendix C C.121. **Permission:** `platform.restrict`.\n\n**Notes:** ADR-KEM-014 §1; operationId listEffectiveRestrictions. Query `resource_type` (ORGANISATION, DOMAIN or MAILBOX) and `resource_id`, both required. A missing or unknown `resource_type`, or any other query parameter, is VALIDATION_FAILED (422) with the parameter named. A missing, malformed, unknown or deleted `resource_id` answers exactly as C.101 answers one (AUTHZ_RESOURCE_NOT_VISIBLE), so the read is not an enumerator. Returns `{restrictions: [Restriction]}`: the rows in force now (not cleared, started, not expired) attached to exactly that resource, each carrying `version` equal to the response ETag. Deliberately not the §8.2 parent chain C.96 returns to a tenant: the version covers exactly the rows it describes, and Ops reads a parent by naming it. `case_ref` is withheld, as on C.96, because the Restriction schema does not declare it.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Bounded by construction rather than paged: a resource carries at most one live restriction per (code, source), so twenty at most."
+      tags:
+        - Restrictions
+      x-karyalay-catalog-id: C.121
+      x-karyalay-permission: platform.restrict
+      parameters:
+        - name: resource_type
+          in: query
+          required: true
+          description: "Type of the resource whose restrictions to read. Required; a missing or unknown value is VALIDATION_FAILED (422) with the parameter named (C.121 notes)."
+          schema:
+            type: string
+            enum:
+              - ORGANISATION
+              - DOMAIN
+              - MAILBOX
+        - name: resource_id
+          in: query
+          required: true
+          description: "The resource, which must be of `resource_type`. Required. A missing, malformed, unknown or deleted id answers exactly as C.101 answers one -- AUTHZ_RESOURCE_NOT_VISIBLE -- so the read is not an enumerator (C.121 notes)."
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Success.
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/RequestId"
+            ETag:
+              "$ref": "#/components/headers/RestrictionStateETag"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/EffectiveRestrictions"
+        "401":
+          "$ref": "#/components/responses/E401"
+        "403":
+          "$ref": "#/components/responses/E403"
+        "404":
+          "$ref": "#/components/responses/E404"
+        "422":
+          "$ref": "#/components/responses/E422"
+        "429":
+          "$ref": "#/components/responses/E429"
+        "500":
+          "$ref": "#/components/responses/E500"
+        "503":
+          "$ref": "#/components/responses/E503"
   "/internal/v1/ops/restrictions/{restriction}":
     delete:
       operationId: clearRestriction
       summary: Clear restriction.
-      description: "Clear restriction.\n\n**Catalog:** Appendix C C.102. **Permission:** `platform.restrict`.\n\n**Notes:** Audited service action; cannot clear immutable compliance hold if future profile says so.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
+      description: "Clear restriction.\n\n**Catalog:** Appendix C C.102. **Permission:** `platform.restrict`.\n\n**Notes:** Audited service action; cannot clear immutable compliance hold if future profile says so. If-Match honoured when supplied (ADR-KEM-014): compared against the restriction-state version of the resource the restriction is attached to, so a change to any restriction on that resource since the caller read it is VERSION_CONFLICT and nothing is cleared. The 200 carries that resource's new restriction-state version as its ETag and as `version` on the returned restriction.\n\n**Validation order:** Authentication → tenant/object visibility → permission/state/entitlement/restriction → request validation → concurrency/idempotency → transaction/external effect (Repo 1 Appendix C).\n\n**Audit:** All administrative/security/destructive mutations; ordinary mailbox reads only as privacy/security policy requires.\n**Events:** Emit named domain event when Appendix D defines semantic change; outbox in same transaction.\n**Errors:** Only Appendix E stable codes applicable to path; validation details are structured and bounded.\n**Rate/size:** Endpoint-specific platform/tenant limits; arrays/pages/uploads are hard bounded."
       tags:
         - Restrictions
       x-karyalay-catalog-id: C.102
@@ -105,6 +165,12 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: If-Match
+          in: header
+          required: false
+          description: "Declared by this operation's Appendix C card: honoured when supplied, not required (Master §20.6). Send the ETag as received. A value that no longer matches the current version returns VERSION_CONFLICT (412) instead of applying the change against a stale view."
+          schema:
+            type: string
       responses:
         "200":
           description: Success.
@@ -125,6 +191,8 @@ paths:
           "$ref": "#/components/responses/E404"
         "409":
           "$ref": "#/components/responses/E409"
+        "412":
+          "$ref": "#/components/responses/E412"
         "422":
           "$ref": "#/components/responses/E422"
         "429":
@@ -475,7 +543,7 @@ components:
             - type: "null"
         version:
           type: string
-          description: "Opaque restriction-state version of the restricted resource (`resource_type`/`resource_id`) as of this representation. Where the response carries an ETag (C.101, C.102) this is the same value. It is the token a caller supplies back as a precondition (ADR-KEM-014, OPS-BND-002). Compare it for equality only; never parse or construct it."
+          description: "Opaque restriction-state version of the restricted resource (`resource_type`/`resource_id`) as of this representation. Where the response carries an ETag (C.101, C.102, C.121) the ETag is this value as a quoted entity-tag. It is the token a caller supplies back as a precondition (ADR-KEM-014, OPS-BND-002). Compare it for equality only; never parse or construct it."
       required:
         - restriction_id
         - resource_type
@@ -483,6 +551,17 @@ components:
         - restriction_code
         - starts_at
       "$comment": "Source: Repo 1 Appendix A.30 restrictions; §36; `version` from ADR-KEM-014."
+    EffectiveRestrictions:
+      type: object
+      description: "The restrictions in force now on exactly one resource -- not cleared, started, not expired -- and nothing inherited from its parents. Unpaged: the card bounds it by construction. Every item's `version` equals the response ETag's value, so the rows and the token describe one state (C.121 notes, ADR-KEM-014 §1)."
+      properties:
+        restrictions:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Restriction"
+      required:
+        - restrictions
+      "$comment": "Source: Repo 1 Appendix C.121; ADR-KEM-014 §1."
     RestrictionRequest:
       type: object
       description: "Request a typed restriction. Repo 4 requests; Repo 1 decides and applies (OPS-BND-001)."
@@ -538,7 +617,7 @@ components:
       schema:
         type: string
     RestrictionStateETag:
-      description: "The restricted resource's restriction-state version (ADR-KEM-014): one opaque token over every restriction on the resource named by `resource_type`/`resource_id`, so a change to any of them changes it. The same value as `version` on the Restriction in the body. It is the token OPS-BND-002's expected precondition carries. Compare it for equality only; never parse or construct it."
+      description: "The restricted resource's restriction-state version (ADR-KEM-014): one opaque token over every restriction on the resource named by `resource_type`/`resource_id`, so a change to any of them changes it. A strong entity-tag: the quoted form of `version` on the Restriction(s) in the body (`version` abc is ETag \"abc\"). It is the token OPS-BND-002's expected precondition carries -- send it back as `If-Match` on C.101 or C.102, as received. Compare it for equality only; never parse or construct it."
       schema:
         type: string
   responses:
@@ -1043,6 +1122,52 @@ components:
                   - AUTH_MFA_REQUIRED
                   - AUTH_REAUTH_REQUIRED
                   - AUTH_REQUIRED
+              detail:
+                type: string
+                description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."
+              request_id:
+                type: string
+                maxLength: 128
+              trace_id:
+                type: string
+                pattern: "^[0-9a-f]{32}$"
+              errors:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/ValidationError"
+    E412:
+      description: "DRAFT_VERSION_CONFLICT — Draft ETag/If-Match conflict. (NON_RETRYABLE)\nVERSION_CONFLICT — If-Match/optimistic version conflict. (NON_RETRYABLE)"
+      headers:
+        X-Request-ID:
+          "$ref": "#/components/headers/RequestId"
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            description: "RFC 9457 problem details for HTTP 412. `code` is narrowed to the catalog codes that map to this status."
+            required:
+              - type
+              - title
+              - status
+              - code
+            properties:
+              type:
+                type: string
+                format: uri
+                description: "https://errors.karyalay.in/mail/{code}"
+              title:
+                type: string
+              status:
+                type: integer
+                minimum: 100
+                maximum: 599
+                const: 412
+              code:
+                type: string
+                description: A code from errors/error-catalog-v1.yaml whose default HTTP mapping is 412.
+                enum:
+                  - DRAFT_VERSION_CONFLICT
+                  - VERSION_CONFLICT
               detail:
                 type: string
                 description: "Operator- and user-safe. Never SQL, a file path, a stack trace, an internal IP or another tenant's address (Master §23.5, Repo 1 §39)."

@@ -80,14 +80,10 @@ sources:
           - document: openapi/operations-api-v1.yaml
             operation_id: clearRestriction
             catalog_id: C.102
+          - document: openapi/operations-api-v1.yaml
+            operation_id: listEffectiveRestrictions
+            catalog_id: C.121
         open_defects:
-          - ref: ADR-KEM-014
-            summary: >-
-              Narrowed in v0.7.0, not closed. The version token is published
-              (Restriction.version, and an ETag on C.101/C.102), but there is
-              still no If-Match to send it back on and no Ops-callable read of
-              effective restrictions, so the OPS-BND-002 precondition cannot yet
-              be enforced. Both wait on karyalay-mail's Appendix C cards.
           - ref: null
             summary: >-
               Containment is incomplete. The row asks for session and
@@ -102,7 +98,11 @@ sources:
           open_defects because v0.7.0 publishes the pattern on every header and
           the absent-vs-malformed selection in each description; karyalay-mail
           still owes serving VALIDATION_FAILED. ADR-KEM-014's defect was
-          narrowed rather than removed.
+          narrowed rather than removed. Later the same day, v0.8.0: removed.
+          karyalay-mail carded C.121 and If-Match on C.101/C.102 (0a06075) and
+          serves them (ac91510), so the OPS-BND-002 precondition has a read to
+          populate it and a header to carry it. AI-01 stays PARTIAL on the one
+          defect left, which has no ADR.
 
       - id: AI-02
         owner: karyalay-mail

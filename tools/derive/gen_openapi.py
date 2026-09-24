@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """T00.04 + T00.05 — author the four OpenAPI documents Master §0.3 names.
 
-  openapi/public-control-api-v1.yaml        C.1-C.65, C.92-C.96   (70 operations)
-  openapi/mailbox-api-v1.yaml               C.66-C.91             (26 operations)
-  openapi/internal-provisioning-api-v1.yaml C.97-C.100, C.105-107 (7 operations)
-  openapi/operations-api-v1.yaml            C.101-C.104           (4 operations)
+  openapi/public-control-api-v1.yaml        C.1-C.65, C.92-C.96, C.114-C.115, C.119-C.120
+  openapi/mailbox-api-v1.yaml               C.66-C.91, C.108-C.113, C.116-C.118
+  openapi/internal-provisioning-api-v1.yaml C.97-C.100, C.105-C.107
+  openapi/operations-api-v1.yaml            C.101-C.104, C.121
+
+Which document an operation belongs to is openapi_ops.OPS; how many each holds
+is printed by every run and written into each document's info.description.
+The counts used to be written here as well, and went stale at the first
+catalog addition -- a fact written twice.
 
 Operations, methods, paths, purposes, permissions and per-endpoint notes are
 transcribed from karyalay-mail repository-spec-v1.0 Appendix C. Conventions come
@@ -62,7 +67,7 @@ DOCUMENTS = {
         "file": "openapi/operations-api-v1.yaml",
         "title": "Karyalay Mail — operations API",
         "summary": "The typed restriction, diagnostics and security-signal surface karyalay-mail-ops calls. Ops requests; karyalay-mail decides and applies.",
-        "spec": "karyalay-mail repository-spec-v1.0 §30, Appendix C.101-C.104; karyalay-mail-ops Appendix AI",
+        "spec": "karyalay-mail repository-spec-v1.0 §30, Appendix C.101-C.104 and C.121; karyalay-mail-ops Appendix AI",
         "audience": "karyalay-mail-ops service identities. Not a public route (Repo 1 §29.2).",
         "server": "https://internal.mail.karyalay.in",
         "internal": True,
@@ -299,8 +304,12 @@ def query_parameters(cid):
         return []
     common = {"cursor", "limit"}
     out = []
-    for name in names:
+    for entry in names:
+        spec = entry if isinstance(entry, dict) else {"name": entry}
+        name = spec["name"]
         if name in common:
+            if len(spec) > 1:
+                sys.exit("%s: `%s` is a shared component and takes no per-operation overrides" % (cid, name))
             out.append({"$ref": "#/components/parameters/%s" % ("Cursor" if name == "cursor" else "Limit")})
         elif name == "q":
             out.append({"name": "q", "in": "query", "required": False, "description": "Free-text filter. For search operations the value is parsed to a typed AST; raw backend syntax is never interpolated (Repo 1 §21.2).", "schema": {"type": "string", "maxLength": 512}})
@@ -325,6 +334,21 @@ def query_parameters(cid):
             out.append({"name": name, "in": "query", "required": False, "schema": {"type": "string", "format": "uuid"}})
         else:
             out.append({"name": name, "in": "query", "required": False, "schema": {"type": "string", "maxLength": 128}})
+
+        # What the card says beyond the name (openapi_ops.QUERY). Rebuilt rather
+        # than patched so every parameter emits its keys in the same order.
+        if len(spec) > 1:
+            base = out.pop()
+            schema = base["schema"]
+            if "enum_from" in spec:
+                owner, prop = spec["enum_from"]
+                schema = {"type": "string", "enum": list(SCHEMAS[owner]["properties"][prop]["enum"])}
+            param = {"name": name, "in": "query", "required": spec.get("required", base["required"])}
+            description = spec.get("description", base.get("description"))
+            if description:
+                param["description"] = description
+            param["schema"] = schema
+            out.append(param)
     return out
 
 
@@ -372,7 +396,7 @@ def components(doc_key, catalog):
         "RequestId": {"description": "Echo of the accepted or generated `X-Request-ID` (Repo 1 §26, Master §20.7).", "schema": {"type": "string", "maxLength": 128}},
         "ETag": {"description": "Optimistic concurrency token. Supply it as `If-Match` on the next update (Master §20.6).", "schema": {"type": "string"}},
         "RestrictionStateETag": {
-            "description": "The restricted resource's restriction-state version (ADR-KEM-014): one opaque token over every restriction on the resource named by `resource_type`/`resource_id`, so a change to any of them changes it. The same value as `version` on the Restriction in the body. It is the token OPS-BND-002's expected precondition carries. Compare it for equality only; never parse or construct it.",
+            "description": "The restricted resource's restriction-state version (ADR-KEM-014): one opaque token over every restriction on the resource named by `resource_type`/`resource_id`, so a change to any of them changes it. A strong entity-tag: the quoted form of `version` on the Restriction(s) in the body (`version` abc is ETag \"abc\"). It is the token OPS-BND-002's expected precondition carries -- send it back as `If-Match` on C.101 or C.102, as received. Compare it for equality only; never parse or construct it.",
             "schema": {"type": "string"},
         },
         "RetryAfter": {"description": "Delay before retrying, for codes in the RETRY_AFTER class (Repo 1 §39).", "schema": {"type": "integer", "minimum": 0}},
@@ -501,7 +525,7 @@ def build_operation(card, binding, catalog_codes):
                 "name": "If-Match",
                 "in": "header",
                 "required": False,
-                "description": "Declared by this operation's Appendix C card: honoured when supplied, not required (Master §20.6). A value that no longer matches the current version returns VERSION_CONFLICT (412) instead of applying the change against a stale view.",
+                "description": "Declared by this operation's Appendix C card: honoured when supplied, not required (Master §20.6). Send the ETag as received. A value that no longer matches the current version returns VERSION_CONFLICT (412) instead of applying the change against a stale view.",
                 "schema": {"type": "string"},
             }
         )
@@ -659,6 +683,11 @@ def build_operation(card, binding, catalog_codes):
 
     applicable = {401, 403, 404, 429, 500, 503}
     if not doc["internal"]:
+        applicable.add(422)
+    # A query string is request input, and request input can fail validation.
+    # The public documents already list 422 on every operation; this is what
+    # gives an internal read that takes a query (C.121) the same answer.
+    if query_parameters(card["id"]):
         applicable.add(422)
     if method in {"post", "put", "patch", "delete"}:
         applicable |= {409, 422}

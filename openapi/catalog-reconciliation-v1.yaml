@@ -5,10 +5,10 @@
 # if any row's operationId is absent from the document it names.
 
 contract: karyalay-mail-contracts/openapi
-contract_version: 0.7.0
+contract_version: 0.8.0
 source: karyalay-mail repository-spec-v1.0 Appendix C
-declared_operation_count: 120
-emitted_operation_count: 120
+declared_operation_count: 121
+emitted_operation_count: 121
 public_surface_count: 70
 operations:
   - catalog_id: C.1
@@ -731,3 +731,9 @@ operations:
     operation_id: revokePushSubscription
     document: public-control-api-v1.yaml
     permission: authenticated
+  - catalog_id: C.121
+    method: GET
+    path: "/internal/v1/ops/restrictions"
+    operation_id: listEffectiveRestrictions
+    document: operations-api-v1.yaml
+    permission: platform.restrict
